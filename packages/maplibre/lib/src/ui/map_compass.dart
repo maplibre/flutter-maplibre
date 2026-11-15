@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/widgets.dart';
 import 'package:maplibre/maplibre.dart';
+import 'package:maplibre/src/ui/map_align.dart';
 import 'package:maplibre/src/ui/map_button.dart';
 
 /// A compass for flutter_map that shows the map rotation and allows to reset
@@ -85,16 +86,18 @@ class MapCompass extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = MapController.maybeOf(context);
-    if (controller == null) return const SizedBox.shrink();
+    final camera = CameraPosition.maybeOf(context);
+    if (controller == null || camera == null) return const SizedBox.shrink();
 
-    final camera = controller.getCamera();
     if (hideIfRotatedNorth && camera.bearing == 0) {
       return const SizedBox.shrink();
     }
 
-    return Container(
+    return placeOnMap(
+      context,
       alignment: alignment,
       padding: padding,
+      safeArea: false,
       child: Transform.rotate(
         angle: (-camera.bearing + rotationOffset) * degree2Radian,
         child: MapTapTarget(

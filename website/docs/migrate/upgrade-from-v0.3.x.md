@@ -391,3 +391,21 @@ await controller.animateCamera(
 `animateCamera` now eases for 300 ms by default, where 0.3 flew for 2 seconds
 on every platform but web. Pass `animation: const CameraAnimation.fly()` to fly.
 
+
+## 16. Widgets in `children`
+
+`MapController.of(context)` and `MapOptions.of(context)` no longer rebuild a
+widget while the camera moves; only `CameraPosition.of(context)` does. A
+widget of yours that reads the camera through the controller, for example
+`MapController.of(context).getCamera()` in `build`, stays still while the map
+moves. Read `CameraPosition.of(context)` instead:
+
+```dart
+// 0.3
+final bearing = MapController.of(context).getCamera().bearing;
+// 0.4
+final bearing = CameraPosition.of(context).bearing;
+```
+
+Widgets in `children` can also add layers, callbacks and limits to the map
+with `MapPlugin`, see [Plugins](../plugins.md).

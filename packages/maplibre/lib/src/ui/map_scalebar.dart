@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:maplibre/maplibre.dart';
+import 'package:maplibre/src/ui/map_align.dart';
 
 /// Display a scalebar to the [MapLibreMap] by using it in
 /// [MapLibreMap.children].
@@ -69,6 +70,8 @@ class MapScalebar extends StatelessWidget {
     final paddingOffset = Offset(totalPadding.left, totalPadding.top);
     final paddedSize =
         screenSize - Offset(totalPadding.right, totalPadding.bottom) as Size;
+    // Inside a MapAlign, its alignment tells about where the scalebar is.
+    final alignment = MapAlign.maybeOf(context) ?? this.alignment;
     final scalebarCenter = alignment.alongSize(paddedSize) + paddingOffset;
     final scalebarLat = controller.toLngLat(scalebarCenter).lat;
 
@@ -80,14 +83,11 @@ class MapScalebar extends StatelessWidget {
       lineColor: lineColor,
       textStyle: textStyle,
     );
-    // Use a SafeArea to ensure the widget is completely visible on devices
-    // with rounded edges like iOS.
-    return SafeArea(
-      child: Container(
-        alignment: alignment,
-        padding: padding,
-        child: CustomPaint(painter: painter, size: Size(painter.width, height)),
-      ),
+    return placeOnMap(
+      context,
+      alignment: alignment,
+      padding: padding,
+      child: CustomPaint(painter: painter, size: Size(painter.width, height)),
     );
   }
 }

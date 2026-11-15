@@ -36,6 +36,35 @@ have access to the following helpful functions.
 - `CameraPosition.maybeOf()`
 - `CameraPosition.of()`
 
+See [Plugins](plugins.md) for what else a widget in `children` can do.
+
+## Placing Widgets
+
+Each widget of this page places itself with its `alignment` and `padding`.
+To put several of them at the same place without overlapping, wrap them in a
+`MapAlign`. It stacks them from top to bottom, or side by side with
+`direction: Axis.horizontal`, and the widgets inside leave out their own
+`alignment` and `padding`.
+
+```dart
+MapLibreMap(
+  children: const [
+    MapAlign(
+      alignment: Alignment.topRight,
+      children: [MapCompass(), MapControlButtons()],
+    ),
+    MapAlign(
+      alignment: Alignment.bottomLeft,
+      children: [MapScalebar()],
+    ),
+    SourceAttribution(),
+  ],
+)
+```
+
+Your own widgets can do the same: `MapAlign.maybeOf(context)` returns the
+alignment of the `MapAlign` around a widget, or null if there is none.
+
 ## Source Attribution
 
 Many sources require proper attribution to comply with their licensing or terms

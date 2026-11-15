@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:maplibre/maplibre.dart';
+import 'package:maplibre/src/ui/map_align.dart';
 import 'package:maplibre/src/ui/map_button.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -84,57 +85,54 @@ class _SourceAttributionState extends State<SourceAttribution> {
       ...style.attributions,
     ];
 
-    // Use a SafeArea to ensure the widget is completely visible on devices
-    // with rounded edges like iOS.
-    return SafeArea(
+    return placeOnMap(
+      context,
+      alignment: widget.alignment,
+      padding: widget.padding,
       child: Container(
-        alignment: widget.alignment,
-        padding: widget.padding,
-        child: Container(
-          decoration: BoxDecoration(
-            color: widget.backgroundColor,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_expanded)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 5, top: 5, left: 10),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: size.width / 2),
-                    child: Wrap(
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      spacing: 2,
-                      runSpacing: 2,
-                      children: attributions
-                          .map((html) => _HtmlWidget(html, widget.textStyle))
-                          .toList(growable: false),
-                    ),
+        decoration: BoxDecoration(
+          color: widget.backgroundColor,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_expanded)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 5, top: 5, left: 10),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: size.width / 2),
+                  child: Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 2,
+                    runSpacing: 2,
+                    children: attributions
+                        .map((html) => _HtmlWidget(html, widget.textStyle))
+                        .toList(growable: false),
                   ),
                 ),
-              SizedBox.square(
-                dimension: 30,
-                child: MapTapTarget(
-                  label: 'Attribution',
-                  onPressed: () => setState(() {
-                    _initCameraPosition = null;
-                    _expanded = !_expanded;
-                  }),
-                  child: Center(
-                    child: CustomPaint(
-                      size: const Size.square(18),
-                      painter: MapButtonIconPainter(
-                        MapButtonIcon.info,
-                        color: widget.iconColor,
-                        backgroundColor: widget.backgroundColor,
-                      ),
+              ),
+            SizedBox.square(
+              dimension: 30,
+              child: MapTapTarget(
+                label: 'Attribution',
+                onPressed: () => setState(() {
+                  _initCameraPosition = null;
+                  _expanded = !_expanded;
+                }),
+                child: Center(
+                  child: CustomPaint(
+                    size: const Size.square(18),
+                    painter: MapButtonIconPainter(
+                      MapButtonIcon.info,
+                      color: widget.iconColor,
+                      backgroundColor: widget.backgroundColor,
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

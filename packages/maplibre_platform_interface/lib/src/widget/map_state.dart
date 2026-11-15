@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/rendering.dart' show BoxHitTestResult;
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:maplibre_platform_interface/maplibre_platform_interface.dart';
 import 'package:maplibre_platform_interface/src/layer/annotation_manager.dart';
 import 'package:maplibre_platform_interface/src/widget/inherited_model.dart';
+import 'package:maplibre_platform_interface/src/widget/map_plugin_registry.dart';
 
 /// The [State] of the [MapLibreMap] widget.
 abstract class MapLibreMapState extends State<MapLibreMap>
@@ -79,8 +81,9 @@ abstract class MapLibreMapState extends State<MapLibreMap>
   @override
   void didUpdateWidget(covariant MapLibreMap oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _annotations.update(widget.layers);
+    _annotations.update(map.layers);
     if (oldWidget.paused != widget.paused) _updateRenderingPaused();
+    didUpdateCallbacks();
   }
 
   /// Pauses the map while [MapLibreMap.paused] is set, while a [Visibility]
@@ -97,9 +100,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
     // This runs while the tree builds, where listeners must not rebuild.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _renderingPaused == paused) {
-        widget.onRenderingChanged?.call(
-          MapEventRenderingChanged(paused: paused),
-        );
+        map.onRenderingChanged?.call(MapEventRenderingChanged(paused: paused));
       }
     });
   }
@@ -113,7 +114,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
   _LayerDrag? _layerDrag;
 
   /// Whether a layer of [MapLibreMap.layers] has draggable features.
-  bool get _layersDraggable => widget.layers.any((layer) => layer.draggable);
+  bool get _layersDraggable => map.layers.any((layer) => layer.draggable);
 
   /// Counts the drags, so that a feature query of a drag that ended or was
   /// followed by another one is dropped.
@@ -131,7 +132,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
     _layerDrag = null;
     _heldDrag = null;
     final generation = ++_dragGeneration;
-    final onDragStart = widget.onDragStart;
+    final onDragStart = map.onDragStart;
     if (!_layersDraggable) return onDragStart?.call(event);
     final starting = _grabFeature(
       event,
@@ -302,8 +303,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
   }
 
   /// Whether a layer of [MapLibreMap.layers] reports taps on its features.
-  bool get _layersClickable =>
-      widget.layers.any((layer) => layer.onClick != null);
+  bool get _layersClickable => map.layers.any((layer) => layer.onClick != null);
 
   /// Whether a layer of [StyleController.layers] reports taps on its
   /// features.
@@ -312,7 +312,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
   static bool _styleClickable(StyleLayer layer) => layer.onClick != null;
 
   void _onClick(MapEventClick event) {
-    widget.onClick?.call(event);
+    map.onClick?.call(event);
     if (_layersClickable || _styleLayersClickable) {
       unawaited(_clickFeature(event));
     }
@@ -421,7 +421,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
 
   /// Whether a layer of [MapLibreMap.layers] reports the mouse over its
   /// features.
-  bool get _layersHoverable => widget.layers.any(_hoverable);
+  bool get _layersHoverable => map.layers.any(_hoverable);
 
   static bool _hoverable(Layer layer) =>
       layer.onEnter != null || layer.onLeave != null;
@@ -454,7 +454,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
   var _hoverGeneration = 0;
 
   void _onPointerMove(MapEventPointerMove event) {
-    widget.onPointerMove?.call(event);
+    map.onPointerMove?.call(event);
     if (!_layersHoverable &&
         !_styleLayersHoverable &&
         _hovered.isEmpty &&
@@ -466,7 +466,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
   }
 
   void _onPointerLeave(MapEventPointerLeave event) {
-    widget.onPointerLeave?.call(event);
+    map.onPointerLeave?.call(event);
     _hoverGeneration++;
     final input = _hoverInput;
     _hoverInput = null;
@@ -557,7 +557,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
     }
     final moved = _emitLayerDrag(event.screenPoint, (layer) => layer.onDrag);
     if (moved != null) _annotations.moveDrag(moved);
-    widget.onDrag?.call(event);
+    map.onDrag?.call(event);
   }
 
   void _onDragEnd(MapEventDragEnd event) {
@@ -570,7 +570,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
       _afterStart(starting, () {
         if (!mounted) return;
         if (generation == _dragGeneration) return _endLayerDrag(event);
-        widget.onDragEnd?.call(event);
+        map.onDragEnd?.call(event);
       }),
     );
   }
@@ -580,7 +580,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
     if (moved != null) _annotations.moveDrag(moved);
     _annotations.endDrag();
     _layerDrag = null;
-    widget.onDragEnd?.call(event);
+    map.onDragEnd?.call(event);
   }
 
   /// Reports the pointer at [screenPoint] to the callback that [callback]
@@ -638,6 +638,309 @@ abstract class MapLibreMapState extends State<MapLibreMap>
     };
   }
 
+  /// The [MapPlugin]s below the map.
+  late final MapPluginRegistry _plugins = MapPluginRegistry(_onPluginsChanged);
+
+  /// The registered plugins in tree order: outer before inner, earlier
+  /// before later.
+  List<MapPluginEntry> _pluginOrder = const [];
+
+  /// Counts the changes of the plugins, so that [map] combines them again.
+  var _pluginsVersion = 0;
+
+  MapLibreMap? _map;
+  MapLibreMap? _mapOf;
+  var _mapVersion = -1;
+
+  /// The plugins at the start of the current drag, which get its moves and
+  /// its end.
+  List<MapPluginEntry> _dragPlugins = const [];
+
+  /// The [Stack] of [MapLibreMap.children], where the plugins are found.
+  final GlobalKey _childrenKey = GlobalKey();
+
+  /// The map as the app and the [MapPlugin]s below it declare it together:
+  /// the widget with the layers of the plugins after [MapLibreMap.layers],
+  /// and callbacks that also call the callbacks of the plugins. A callback
+  /// is null while neither the app nor a plugin sets it.
+  ///
+  /// Platforms read the callbacks from here instead of [widget], and update
+  /// what they listen for in [didUpdateCallbacks].
+  @protected
+  MapLibreMap get map {
+    final cached = _map;
+    if (cached != null &&
+        identical(_mapOf, widget) &&
+        _mapVersion == _pluginsVersion) {
+      return cached;
+    }
+    _mapOf = widget;
+    _mapVersion = _pluginsVersion;
+    return _map = _pluginOrder.isEmpty ? widget : _combine(widget);
+  }
+
+  /// Called when the callbacks of [map] may have changed: after
+  /// [didUpdateWidget] and when the plugins changed.
+  @protected
+  void didUpdateCallbacks() {}
+
+  void _onPluginsChanged() {
+    if (!mounted) return;
+    _pluginOrder = _pluginsInTreeOrder();
+    _pluginsVersion++;
+    _annotations.update(map.layers);
+    didUpdateCallbacks();
+    setState(() {});
+  }
+
+  List<MapPluginEntry> _pluginsInTreeOrder() {
+    final registered = _plugins.entries;
+    if (registered.isEmpty) return const [];
+    final order = <MapPluginEntry>[];
+    void visit(Element element) {
+      if (element case StatefulElement(state: final MapPluginEntry entry)
+          when registered.contains(entry)) {
+        order.add(entry);
+      }
+      element.visitChildren(visit);
+    }
+
+    _childrenKey.currentContext?.visitChildElements(visit);
+    return order;
+  }
+
+  /// The plugins at [point], in the order that Flutter hit-tests them: the
+  /// topmost first, inner before outer.
+  List<MapPluginEntry> _pluginsAt(Offset point) {
+    final box = _childrenKey.currentContext?.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return const [];
+    final result = BoxHitTestResult();
+    box.hitTest(result, position: point);
+    final registered = _plugins.entries;
+    return [
+      for (final hit in result.path)
+        if (hit.target case RenderMapPlugin(:final entry)
+            when registered.contains(entry))
+          entry,
+    ];
+  }
+
+  /// The movements that [MapOptions.movements] and every plugin allow.
+  MapMovements get _movements {
+    var movements = options.movements;
+    for (final entry in _pluginOrder) {
+      final other = entry.plugin.movements;
+      movements = MapMovements(
+        pan: movements.pan && other.pan,
+        zoom: movements.zoom && other.zoom,
+        rotate: movements.rotate && other.rotate,
+        pitch: movements.pitch && other.pitch,
+      );
+    }
+    return movements;
+  }
+
+  /// The gestures that [MapOptions.gestures] and every plugin allow.
+  MapGestures get _gestures {
+    var gestures = options.gestures;
+    for (final entry in _pluginOrder) {
+      final other = entry.plugin.gestures;
+      gestures = MapGestures(
+        drag: gestures.drag && other.drag,
+        fling: gestures.fling && other.fling,
+        pinch: gestures.pinch && other.pinch,
+        scrollWheel: gestures.scrollWheel && other.scrollWheel,
+        doubleTap: gestures.doubleTap && other.doubleTap,
+        doubleTapDrag: gestures.doubleTapDrag && other.doubleTapDrag,
+        secondaryDrag: gestures.secondaryDrag && other.secondaryDrag,
+        twoFingerDrag: gestures.twoFingerDrag && other.twoFingerDrag,
+      );
+    }
+    return gestures;
+  }
+
+  MapLibreMap _combine(MapLibreMap app) {
+    final plugins = _pluginOrder;
+    bool any(Object? Function(MapPlugin plugin) pick) =>
+        plugins.any((entry) => pick(entry.plugin) != null);
+    final drags =
+        any((p) => p.onDragStart) ||
+        any((p) => p.onDrag) ||
+        any((p) => p.onDragEnd);
+    final onDragStart = app.onDragStart;
+    final onDrag = app.onDrag;
+    final onDragEnd = app.onDragEnd;
+    return MapLibreMap(
+      options: app.options,
+      gestureRecognizers: app.gestureRecognizers,
+      onMapCreated: app.onMapCreated,
+      onStyleLoaded: _toAll(app.onStyleLoaded, (p) => p.onStyleLoaded),
+      onClick: _atPointer(app.onClick, (p) => p.onClick),
+      onDoubleClick: _inOrderAtPointer(
+        app.onDoubleClick,
+        (p) => p.onDoubleClick,
+      ),
+      onSecondaryClick: _atPointer(
+        app.onSecondaryClick,
+        (p) => p.onSecondaryClick,
+      ),
+      onLongClick: _atPointer(app.onLongClick, (p) => p.onLongClick),
+      onDragStart: drags
+          ? (event) {
+              final at = _dragPlugins = _pluginsAt(event.screenPoint);
+              return _inOrder([
+                for (final entry in at) ?entry.plugin.onDragStart,
+                ?onDragStart,
+              ], event);
+            }
+          : onDragStart,
+      onDrag: drags || onDrag != null
+          ? (event) {
+              for (final entry in _dragPlugins) {
+                _callPlugin(entry, () => entry.plugin.onDrag?.call(event));
+              }
+              onDrag?.call(event);
+            }
+          : null,
+      onDragEnd: drags || onDragEnd != null
+          ? (event) {
+              final at = _dragPlugins;
+              _dragPlugins = const [];
+              for (final entry in at) {
+                _callPlugin(entry, () => entry.plugin.onDragEnd?.call(event));
+              }
+              onDragEnd?.call(event);
+            }
+          : null,
+      onPointerMove: _atPointer(app.onPointerMove, (p) => p.onPointerMove),
+      onPointerLeave: _toAll(app.onPointerLeave, (p) => p.onPointerLeave),
+      onCameraMoveStart: _toAll(
+        app.onCameraMoveStart,
+        (p) => p.onCameraMoveStart,
+      ),
+      onCameraMove: _toAll(app.onCameraMove, (p) => p.onCameraMove),
+      onCameraMoveEnd: _toAll(app.onCameraMoveEnd, (p) => p.onCameraMoveEnd),
+      onIdle: _toAll(app.onIdle, (p) => p.onIdle),
+      onError: _toAll(app.onError, (p) => p.onError),
+      onStyleImageMissing: _toAll(
+        app.onStyleImageMissing,
+        (p) => p.onStyleImageMissing,
+      ),
+      onLoadingStarted: _toAll(app.onLoadingStarted, (p) => p.onLoadingStarted),
+      onLoadingFinished: _toAll(
+        app.onLoadingFinished,
+        (p) => p.onLoadingFinished,
+      ),
+      onSourceChanged: _toAll(app.onSourceChanged, (p) => p.onSourceChanged),
+      onTile: _toAll(app.onTile, (p) => p.onTile),
+      onRenderFrame: _toAll(app.onRenderFrame, (p) => p.onRenderFrame),
+      onRenderMap: _toAll(app.onRenderMap, (p) => p.onRenderMap),
+      onGlyphs: _toAll(app.onGlyphs, (p) => p.onGlyphs),
+      onSprite: _toAll(app.onSprite, (p) => p.onSprite),
+      onRenderingChanged: _toAll(
+        app.onRenderingChanged,
+        (p) => p.onRenderingChanged,
+      ),
+      onResize: _toAll(app.onResize, (p) => p.onResize),
+      onContextLost: _toAll(app.onContextLost, (p) => p.onContextLost),
+      onContextRestored: _toAll(
+        app.onContextRestored,
+        (p) => p.onContextRestored,
+      ),
+      onProjectionChanged: _toAll(
+        app.onProjectionChanged,
+        (p) => p.onProjectionChanged,
+      ),
+      layers: [
+        ...app.layers,
+        for (final entry in plugins) ...entry.plugin.layers,
+      ],
+      paused: app.paused,
+      children: app.children,
+    );
+  }
+
+  /// Calls the callback that [pick] picks of every plugin, in tree order,
+  /// and then [app].
+  void Function(T)? _toAll<T>(
+    void Function(T)? app,
+    void Function(T)? Function(MapPlugin plugin) pick,
+  ) {
+    if (!_pluginOrder.any((entry) => pick(entry.plugin) != null)) return app;
+    return (event) {
+      for (final entry in _pluginOrder) {
+        _callPlugin(entry, () => pick(entry.plugin)?.call(event));
+      }
+      app?.call(event);
+    };
+  }
+
+  /// Calls the callback that [pick] picks of the plugins at the event, and
+  /// then [app].
+  MapEventCallback<T>? _atPointer<T extends MapEventUserInput>(
+    MapEventCallback<T>? app,
+    MapEventCallback<T>? Function(MapPlugin plugin) pick,
+  ) {
+    if (!_pluginOrder.any((entry) => pick(entry.plugin) != null)) return app;
+    return (event) {
+      for (final entry in _pluginsAt(event.screenPoint)) {
+        _callPlugin(entry, () => pick(entry.plugin)?.call(event));
+      }
+      app?.call(event);
+    };
+  }
+
+  /// Like [_atPointer], but waits for each callback that returns a
+  /// [Future] before it calls the next.
+  FutureOr<void> Function(T)? _inOrderAtPointer<T extends MapEventUserInput>(
+    FutureOr<void> Function(T)? app,
+    FutureOr<void> Function(T)? Function(MapPlugin plugin) pick,
+  ) {
+    if (!_pluginOrder.any((entry) => pick(entry.plugin) != null)) return app;
+    return (event) => _inOrder([
+      for (final entry in _pluginsAt(event.screenPoint)) ?pick(entry.plugin),
+      ?app,
+    ], event);
+  }
+
+  /// Calls [callbacks] one after another, each once the [Future] of the one
+  /// before completes. Reports their errors.
+  FutureOr<void> _inOrder<T>(
+    List<FutureOr<void> Function(T)> callbacks,
+    T event, [
+    int from = 0,
+  ]) {
+    for (var i = from; i < callbacks.length; i++) {
+      final FutureOr<void> result;
+      try {
+        result = callbacks[i](event);
+      } on Object catch (error, stack) {
+        _reportError(error, stack, 'while handling a map event');
+        continue;
+      }
+      if (result is Future<void>) {
+        return result
+            .then<void>(
+              (_) {},
+              onError: (Object error, StackTrace stack) =>
+                  _reportError(error, stack, 'while handling a map event'),
+            )
+            .then((_) => mounted ? _inOrder(callbacks, event, i + 1) : null);
+      }
+    }
+  }
+
+  /// Calls [call], a callback of the plugin of [entry] while it is
+  /// registered, and reports its errors.
+  void _callPlugin(MapPluginEntry entry, void Function() call) {
+    if (!_plugins.entries.contains(entry)) return;
+    try {
+      call();
+    } on Object catch (error, stack) {
+      _reportError(error, stack, 'while handling a map event of a plugin');
+    }
+  }
+
   /// The size of the map's last layout, to report changes with
   /// [MapLibreMap.onResize].
   Size? _size;
@@ -651,7 +954,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
     // Layout runs while the tree builds, where listeners must not rebuild.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _size == size) {
-        widget.onResize?.call(MapEventResize(size: size));
+        map.onResize?.call(MapEventResize(size: size));
       }
     });
   }
@@ -685,6 +988,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
   @override
   void dispose() {
     _styleLayers?.callbacksChanged.removeListener(_onStyleCallbacksChanged);
+    _plugins.dispose();
     super.dispose();
   }
 
@@ -693,12 +997,13 @@ abstract class MapLibreMapState extends State<MapLibreMap>
     final gestureCamera = this.gestureCamera;
     final platformWidget = buildPlatformWidget(context);
     final widget = this.widget;
+    final map = this.map;
     final layersDraggable = _layersDraggable;
     // Only the gesture detector reports taps and the mouse to style layers.
     if (gestureCamera != null) _listenToStyleLayers();
     final clicks =
         gestureCamera != null &&
-        (_layersClickable || _styleLayersClickable || widget.onClick != null);
+        (_layersClickable || _styleLayersClickable || map.onClick != null);
     // Hovered features are left once the last hoverable layer is gone.
     final hovers =
         gestureCamera != null &&
@@ -715,27 +1020,25 @@ abstract class MapLibreMapState extends State<MapLibreMap>
               platformWidget
             else
               MapGestureDetector(
-                movements: options.movements,
-                gestures: options.gestures,
+                movements: _movements,
+                gestures: _gestures,
                 camera: gestureCamera,
                 toLngLat: (point) => isInitialized ? toLngLat(point) : null,
                 onClick: clicks ? _onClick : null,
-                onDoubleClick: widget.onDoubleClick,
-                onSecondaryClick: widget.onSecondaryClick,
-                onLongClick: widget.onLongClick,
-                onDragStart: layersDraggable || widget.onDragStart != null
+                onDoubleClick: map.onDoubleClick,
+                onSecondaryClick: map.onSecondaryClick,
+                onLongClick: map.onLongClick,
+                onDragStart: layersDraggable || map.onDragStart != null
                     ? _onDragStart
                     : null,
-                onDrag: layersDraggable || widget.onDrag != null
-                    ? _onDrag
-                    : null,
-                onDragEnd: layersDraggable || widget.onDragEnd != null
+                onDrag: layersDraggable || map.onDrag != null ? _onDrag : null,
+                onDragEnd: layersDraggable || map.onDragEnd != null
                     ? _onDragEnd
                     : null,
-                onPointerMove: hovers || widget.onPointerMove != null
+                onPointerMove: hovers || map.onPointerMove != null
                     ? _onPointerMove
                     : null,
-                onPointerLeave: hovers || widget.onPointerLeave != null
+                onPointerLeave: hovers || map.onPointerLeave != null
                     ? _onPointerLeave
                     : null,
                 child: platformWidget,
@@ -743,8 +1046,11 @@ abstract class MapLibreMapState extends State<MapLibreMap>
             MapLibreInheritedModel(
               mapController: this,
               cameraPosition: camera,
+              options: options,
+              style: style,
+              plugins: _plugins,
               child: isInitialized
-                  ? Stack(children: widget.children)
+                  ? Stack(key: _childrenKey, children: widget.children)
                   : const SizedBox.shrink(),
             ),
           ],
