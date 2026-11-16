@@ -141,8 +141,7 @@ class MapLibreMapStateNative extends MapLibreMapState {
       _eventMask = eventMask;
       map.discarding.setEventMask(eventMask);
     }
-    final options = this.options;
-    final initCamera = options.initCamera;
+    final initCamera = initialCamera;
     // Without an initial camera, MapLibre Native moves to the camera of the
     // style once it loads, but only while no camera change happened. Setting
     // camera constraints is one, so they follow the first style.
@@ -204,6 +203,17 @@ class MapLibreMapStateNative extends MapLibreMapState {
       unawaited(_setStyle(options.style));
     }
     super.didUpdateWidget(oldWidget);
+  }
+
+  /// Submits [camera] without waiting, so the map renders it next, in
+  /// order with every later command.
+  @override
+  void applyCamera(CameraPosition camera) {
+    final map = _map;
+    if (map == null) return;
+    _cancelAnimation();
+    _nextChangeReason = CameraChangeReason.programmatic;
+    map.discarding.updateCamera(mln.CameraUpdate(camera: camera.toMln()));
   }
 
   @override

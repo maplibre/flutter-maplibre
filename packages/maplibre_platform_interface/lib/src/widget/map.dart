@@ -14,6 +14,7 @@ class MapLibreMap extends StatefulWidget {
   /// properties.
   const MapLibreMap({
     this.options = const MapOptions(),
+    this.camera,
     this.gestureRecognizers,
     this.onMapCreated,
     this.onStyleLoaded,
@@ -53,6 +54,27 @@ class MapLibreMap extends StatefulWidget {
 
   /// Use the [options] field to customize the map and set default values.
   final MapOptions options;
+
+  /// The camera that the map shows, for an app that drives the camera
+  /// itself, such as another map whose camera this one follows, or a
+  /// custom gesture layer.
+  ///
+  /// While it is set, the map shows this camera from its first frame on and
+  /// the map gestures don't move the camera, as if [MapOptions.movements]
+  /// were [MapMovements.none]. Each new camera is applied while the widget
+  /// builds, so the map reaches it as soon as the platform allows:
+  ///
+  /// - On web, the map draws it in the same browser frame as the widgets
+  ///   that this build positions.
+  /// - On every other platform, the map renders it right away and shows it
+  ///   a frame or two later. [CameraPosition.of] in [children] follows the
+  ///   frame on screen, so widgets that position themselves with it stay on
+  ///   the map image.
+  ///
+  /// [MapController.moveCamera] and [MapController.animateCamera] still move
+  /// the camera until the next build with a different [camera]. Set it to
+  /// null to hand the camera back to the gestures and the controller.
+  final CameraPosition? camera;
 
   /// Flutter widgets that get displayed on top on the map and are within the
   /// [MapLibreMap] context.

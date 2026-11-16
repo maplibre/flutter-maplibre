@@ -64,6 +64,8 @@ class TestMap {
     this.events,
     this.lifecycle,
     this._app,
+    this._options,
+    this._camera,
   );
 
   final WidgetTester tester;
@@ -75,11 +77,20 @@ class TestMap {
   /// The [MapLibreMap.onMapCreated] and [MapLibreMap.onStyleLoaded] calls, in
   /// order.
   final List<MapLifecycle> lifecycle;
-  final MapApp Function(MapOptions options) _app;
+  final MapApp Function(MapOptions options, CameraPosition? camera) _app;
+  MapOptions _options;
+  CameraPosition? _camera;
 
   /// Shows the map with new [options], keeping its callbacks and layers.
   Future<void> setOptions(MapOptions options) async {
-    await tester.pumpWidget(_app(options));
+    _options = options;
+    await tester.pumpWidget(_app(options, _camera));
+  }
+
+  /// Shows the map with a new [MapLibreMap.camera], keeping the rest.
+  Future<void> setCamera(CameraPosition? camera) async {
+    _camera = camera;
+    await tester.pumpWidget(_app(_options, camera));
   }
 
   /// The style of the map, replaced whenever a style loads.
@@ -281,13 +292,15 @@ Future<TestMap> pumpMap(
   List<Layer> layers = const [],
   List<Widget> children = const [],
   bool paused = false,
+  CameraPosition? camera,
 }) async {
   final events = <MapEvent>[];
   final lifecycle = <MapLifecycle>[];
   final controller = Completer<MapController>();
   final style = Completer<StyleController>();
-  MapApp app(MapOptions options) => MapApp(
+  MapApp app(MapOptions options, CameraPosition? camera) => MapApp(
     options: options,
+    camera: camera,
     layers: layers,
     onMapCreated: (controller_) {
       lifecycle.add(MapLifecycle.created);
@@ -301,7 +314,8 @@ Future<TestMap> pumpMap(
     paused: paused,
     children: children,
   );
-  await tester.pumpWidget(app(options ?? offlineOptions()));
+  final initialOptions = options ?? offlineOptions();
+  await tester.pumpWidget(app(initialOptions, camera));
   // On web, the first map waits for maplibre-gl-js to load, and is created
   // in a later frame.
   final deadline = DateTime.now().add(defaultTimeout);
@@ -317,6 +331,8 @@ Future<TestMap> pumpMap(
     events,
     lifecycle,
     app,
+    initialOptions,
+    camera,
   );
   await style.future.timeout(defaultTimeout);
   // Let the first frame reach Flutter, so projections follow the camera.
@@ -336,6 +352,7 @@ Future<TestMap> pumpMap(
 class MapApp extends StatelessWidget {
   const MapApp({
     required this.options,
+    this.camera,
     this.layers = const [],
     this.onMapCreated,
     this.onStyleLoaded,
@@ -347,6 +364,7 @@ class MapApp extends StatelessWidget {
   });
 
   final MapOptions options;
+  final CameraPosition? camera;
   final List<Layer> layers;
   final MapCreatedCallback? onMapCreated;
   final StyleLoadedCallback? onStyleLoaded;
@@ -361,6 +379,7 @@ class MapApp extends StatelessWidget {
     home: Scaffold(
       body: MapLibreMap(
         options: options,
+        camera: camera,
         layers: layers,
         onMapCreated: onMapCreated,
         onStyleLoaded: onStyleLoaded,

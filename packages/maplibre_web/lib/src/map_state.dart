@@ -126,7 +126,7 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         // The map has the size of its platform view only now, so bounds are
         // fitted again for it.
-        if (options.initCamera case final CameraUpdateFit initCamera) {
+        if (initialCamera case final CameraUpdateFit initCamera) {
           _resizeMap();
           _applyInitialCamera(initCamera);
         }
@@ -144,7 +144,7 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
       _map.setMaxBounds(options.maxBounds?.toJs());
       // Without an initial camera, the map takes the style's camera once it
       // loads.
-      if (options.initCamera case final initCamera?) {
+      if (initialCamera case final initCamera?) {
         _applyInitialCamera(initCamera);
       }
 
@@ -271,8 +271,10 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
             reason = CameraChangeReason.map;
           }
           _moveReason = reason;
-          effectiveWidget.onCameraMoveStart?.call(
-            MapEventCameraMoveStart(reason: reason),
+          _report(
+            () => effectiveWidget.onCameraMoveStart?.call(
+              MapEventCameraMoveStart(reason: reason),
+            ),
           );
         }.toJS,
       );
@@ -283,8 +285,11 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
           if (_silentCamera) return;
           final mapCamera = getCamera();
           setState(() => camera = mapCamera);
-          effectiveWidget.onCameraMove?.call(
-            MapEventCameraMove(camera: mapCamera, reason: _moveReason),
+          final reason = _moveReason;
+          _report(
+            () => effectiveWidget.onCameraMove?.call(
+              MapEventCameraMove(camera: mapCamera, reason: reason),
+            ),
           );
         }.toJS,
       );
@@ -464,6 +469,30 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
     if (target == null) return stopCamera();
     _nextGestureCausedByController = true;
     _map.jumpTo(target as interop.JumpToOptions);
+  }
+
+  /// Jumps to [camera] while the widget builds, so that GL JS draws it in
+  /// the browser frame that shows this build: with multi-threaded skwasm,
+  /// both show in the next browser frame, as GL JS draws a camera change
+  /// made within a frame in the next one. CanvasKit and single-threaded
+  /// skwasm show the build in the current browser frame, so GL JS redraws
+  /// right away.
+  @override
+  void applyCamera(CameraPosition camera) {
+    if (!_mapCreated) return;
+    final target = _targetReplacing(
+      camera.toCameraUpdate(),
+      CameraAnimationResult.cancelled,
+    );
+    if (target == null) return;
+    _nextGestureCausedByController = true;
+    _applyingCamera = true;
+    try {
+      _map.jumpTo(target as interop.JumpToOptions);
+      if (!FrameAlignedGestureCamera.isNeeded) _map.redraw();
+    } finally {
+      _applyingCamera = false;
+    }
   }
 
   @override
@@ -785,10 +814,20 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
   CameraChangeReason _moveReason = CameraChangeReason.map;
 
   void _onCameraMoveEnd() {
-    effectiveWidget.onCameraMoveEnd?.call(
-      MapEventCameraMoveEnd(camera: getCamera(), reason: _moveReason),
+    final event = MapEventCameraMoveEnd(
+      camera: getCamera(),
+      reason: _moveReason,
     );
+    _report(() => effectiveWidget.onCameraMoveEnd?.call(event));
   }
+
+  /// Whether [applyCamera] moves the camera while the widget builds.
+  var _applyingCamera = false;
+
+  /// Calls the camera callback [call] right away, or after the build while
+  /// [applyCamera] moves the camera, as callbacks may rebuild other widgets.
+  void _report(void Function() call) =>
+      _applyingCamera ? scheduleMicrotask(call) : call();
 
   /// The listener of the render event, which fires for every frame, so it
   /// is only registered while [MapLibreMap.onRenderFrame] is set.
