@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:maplibre_platform_interface/maplibre_platform_interface.dart';
 import 'package:maplibre_platform_interface/src/widget/map_plugin_registry.dart';
@@ -5,7 +6,8 @@ import 'package:maplibre_platform_interface/src/widget/map_plugin_registry.dart'
 /// What a widget below a [MapLibreMap] depends on, so that it only rebuilds
 /// when that changes.
 enum MapLibreAspect {
-  /// The [MapController], its [MapOptions] and its [StyleController].
+  /// The [MapController], its [MapOptions], its [StyleController] and the
+  /// attributions of the style.
   controller,
 
   /// The [CameraPosition], which changes with every frame of a camera move.
@@ -23,6 +25,7 @@ class MapLibreInheritedModel extends InheritedModel<MapLibreAspect> {
     required this.cameraPosition,
     this.options,
     this.style,
+    this.attributions,
     this.plugins,
     super.key,
   });
@@ -41,6 +44,10 @@ class MapLibreInheritedModel extends InheritedModel<MapLibreAspect> {
   /// widgets that depend on the controller rebuild when it changes.
   final StyleController? style;
 
+  /// The [StyleController.attributions] when this model was built, so that
+  /// the widgets that depend on the controller rebuild when they change.
+  final List<String>? attributions;
+
   /// The [MapPlugin]s below the map register here.
   final MapPluginRegistry? plugins;
 
@@ -53,8 +60,8 @@ class MapLibreInheritedModel extends InheritedModel<MapLibreAspect> {
   );
 
   /// Get the in the widget tree injected [MapController]. The widget of
-  /// [context] rebuilds when the controller, its options or its style
-  /// change, but not when the camera moves.
+  /// [context] rebuilds when the controller, its options, its style or the
+  /// attributions of the style change, but not when the camera moves.
   /// Used in [MapController.maybeOf] and [MapOptions.maybeOf].
   static MapController? maybeMapControllerOf(BuildContext context) =>
       _of(context, MapLibreAspect.controller)?.mapController;
@@ -72,7 +79,8 @@ class MapLibreInheritedModel extends InheritedModel<MapLibreAspect> {
   bool _controllerChanged(MapLibreInheritedModel oldWidget) =>
       !identical(mapController, oldWidget.mapController) ||
       options != oldWidget.options ||
-      !identical(style, oldWidget.style);
+      !identical(style, oldWidget.style) ||
+      !listEquals(attributions, oldWidget.attributions);
 
   bool _cameraChanged(MapLibreInheritedModel oldWidget) =>
       cameraPosition != oldWidget.cameraPosition;

@@ -13,11 +13,13 @@ abstract interface class MapPluginEntry {
 /// its own parameters.
 class MapPluginRegistry {
   /// Creates a registry that calls [onChanged] after the frame in which
-  /// plugins were added, removed or rebuilt.
+  /// plugins were added, removed or changed.
   MapPluginRegistry(this.onChanged);
 
-  /// Called once after a frame in which the plugins changed.
-  final VoidCallback onChanged;
+  /// Called once after a frame in which the plugins changed. `structural`
+  /// is false when only the layers of plugins changed, and true when
+  /// plugins came or went, or changed their callbacks or limits.
+  final void Function({required bool structural}) onChanged;
 
   final _entries = <MapPluginEntry>{};
 
@@ -25,33 +27,38 @@ class MapPluginRegistry {
   Set<MapPluginEntry> get entries => _entries;
 
   var _scheduled = false;
+  var _structural = false;
   var _disposed = false;
 
   /// Adds [entry], which was just mounted.
   void add(MapPluginEntry entry) {
-    _entries.add(entry);
-    _changed();
+    if (_entries.add(entry)) _changed(structural: true);
   }
 
-  /// Notes that the widget of [entry] changed.
-  void update(MapPluginEntry entry) => _changed();
+  /// Notes that the widget of [entry] changed: only its layers, unless
+  /// [structural].
+  void update(MapPluginEntry entry, {required bool structural}) =>
+      _changed(structural: structural);
 
   /// Removes [entry], which is about to be unmounted.
   void remove(MapPluginEntry entry) {
-    if (_entries.remove(entry)) _changed();
+    if (_entries.remove(entry)) _changed(structural: true);
   }
 
   /// Stops reporting changes, as the map is gone.
   void dispose() => _disposed = true;
 
-  void _changed() {
+  void _changed({required bool structural}) {
+    _structural |= structural;
     if (_scheduled || _disposed) return;
     _scheduled = true;
     // Plugins change while the tree builds, where the map must not rebuild.
     SchedulerBinding.instance
       ..addPostFrameCallback((_) {
         _scheduled = false;
-        if (!_disposed) onChanged();
+        final structural = _structural;
+        _structural = false;
+        if (!_disposed) onChanged(structural: structural);
       })
       ..ensureVisualUpdate();
   }

@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maplibre_platform_interface/maplibre_platform_interface.dart';
 import 'package:maplibre_platform_interface/src/layer/annotation_manager.dart';
+import 'package:maplibre_platform_interface/src/widget/inherited_model.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 const _size = Size(800, 600);
@@ -76,7 +78,7 @@ class _State extends MapLibreMapState {
   void didUpdateCallbacks() => callbackUpdates++;
 
   /// The map with the plugins, for the tests.
-  MapLibreMap get combined => map;
+  MapLibreMap get combined => effectiveWidget;
 
   @override
   GestureCameraSink get gestureCamera => sink;
@@ -104,7 +106,7 @@ class _State extends MapLibreMapState {
     };
     final features = <RenderedFeature>[];
     // Without a style, the layers are drawn in the order of the list.
-    for (final layer in map.layers.reversed) {
+    for (final layer in effectiveWidget.layers.reversed) {
       final layerId = annotationLayerId(layer)!;
       if (!layerIds!.contains(layerId)) continue;
       for (final (index, feature) in layer.list.indexed) {
@@ -512,5 +514,191 @@ void main() {
       expect(optionsBuilds, isEmpty);
       expect(cameraBuilds, hasLength(2));
     });
+
+    testWidgets('widgets that read the controller rebuild when the '
+        'attributions change', (tester) async {
+      final builds = <int>[];
+      final controller = _State(_Camera());
+      // The same child, which only rebuilds when the model notifies it.
+      final child = _BuildCounter(MapController.of, builds);
+      Widget model(List<String> attributions) => Directionality(
+        textDirection: TextDirection.ltr,
+        child: MapLibreInheritedModel(
+          mapController: controller,
+          cameraPosition: null,
+          attributions: attributions,
+          child: child,
+        ),
+      );
+      await tester.pumpWidget(model(['a']));
+      builds.clear();
+      await tester.pumpWidget(model(['a']));
+      expect(builds, isEmpty);
+      await tester.pumpWidget(model(['a', 'b']));
+      expect(builds, hasLength(1));
+    });
+
+    testWidgets('a plugin that rebuilds unchanged leaves the map alone', (
+      tester,
+    ) async {
+      final key = GlobalKey<_RebuildingState>();
+      final layer = _PointLayer(list: [_point(0, 0)]);
+      await pumpMap(
+        tester,
+        children: [
+          _Rebuilding(key: key, layers: [layer]),
+        ],
+      );
+      final updates = platform.state.callbackUpdates;
+      final combined = platform.state.combined;
+      key.currentState!.rebuild();
+      await tester.pumpAndSettle();
+      expect(platform.state.callbackUpdates, updates);
+      expect(platform.state.combined, same(combined));
+      // New layers update the map without the platform.
+      key.currentState!.rebuild(
+        layers: [
+          _PointLayer(list: [_point(1, 0)]),
+        ],
+      );
+      await tester.pumpAndSettle();
+      expect(platform.state.callbackUpdates, updates);
+      expect(
+        platform.state.combined.layers.single.list.single,
+        isNot(same(layer.list.single)),
+      );
+      // A new callback reaches the platform.
+      key.currentState!.rebuild(onIdle: (_) {});
+      await tester.pumpAndSettle();
+      expect(platform.state.callbackUpdates, greaterThan(updates));
+      expect(platform.state.combined.onIdle, isNotNull);
+    });
   });
+
+  group('combined widget', () {
+    testWidgets('keeps every parameter of the app with a plugin present', (
+      tester,
+    ) async {
+      void onEvent(Object? _) {}
+      const options = MapOptions(minZoom: 3);
+      final layers = [
+        _PointLayer(list: [_point(0, 0)]),
+      ];
+      final children = [const MapPlugin()];
+      final recognizers = <Factory<OneSequenceGestureRecognizer>>{};
+      final app = MapLibreMap(
+        options: options,
+        gestureRecognizers: recognizers,
+        onMapCreated: onEvent,
+        onStyleLoaded: onEvent,
+        onClick: onEvent,
+        onDoubleClick: onEvent,
+        onSecondaryClick: onEvent,
+        onLongClick: onEvent,
+        onDragStart: onEvent,
+        onDrag: onEvent,
+        onDragEnd: onEvent,
+        onPointerMove: onEvent,
+        onPointerLeave: onEvent,
+        onCameraMoveStart: onEvent,
+        onCameraMove: onEvent,
+        onCameraMoveEnd: onEvent,
+        onIdle: onEvent,
+        onError: onEvent,
+        onStyleImageMissing: onEvent,
+        onLoadingStarted: onEvent,
+        onLoadingFinished: onEvent,
+        onSourceChanged: onEvent,
+        onTile: onEvent,
+        onRenderFrame: onEvent,
+        onRenderMap: onEvent,
+        onGlyphs: onEvent,
+        onSprite: onEvent,
+        onRenderingChanged: onEvent,
+        onResize: onEvent,
+        onContextLost: onEvent,
+        onContextRestored: onEvent,
+        onProjectionChanged: onEvent,
+        layers: layers,
+        paused: true,
+        children: children,
+      );
+      tester.view
+        ..physicalSize = _size
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        Directionality(textDirection: TextDirection.ltr, child: app),
+      );
+      await tester.pumpAndSettle();
+      final combined = platform.state.combined;
+      expect(combined, isNot(same(app)));
+      expect(combined.options, same(options));
+      expect(combined.gestureRecognizers, same(recognizers));
+      expect(combined.layers, layers);
+      expect(combined.paused, isTrue);
+      expect(combined.children, same(children));
+      // No plugin listens, so every callback is the app's own.
+      final callbacks = <Object? Function(MapLibreMap)>[
+        (m) => m.onMapCreated,
+        (m) => m.onStyleLoaded,
+        (m) => m.onClick,
+        (m) => m.onDoubleClick,
+        (m) => m.onSecondaryClick,
+        (m) => m.onLongClick,
+        (m) => m.onPointerMove,
+        (m) => m.onPointerLeave,
+        (m) => m.onCameraMoveStart,
+        (m) => m.onCameraMove,
+        (m) => m.onCameraMoveEnd,
+        (m) => m.onIdle,
+        (m) => m.onError,
+        (m) => m.onStyleImageMissing,
+        (m) => m.onLoadingStarted,
+        (m) => m.onLoadingFinished,
+        (m) => m.onSourceChanged,
+        (m) => m.onTile,
+        (m) => m.onRenderFrame,
+        (m) => m.onRenderMap,
+        (m) => m.onGlyphs,
+        (m) => m.onSprite,
+        (m) => m.onRenderingChanged,
+        (m) => m.onResize,
+        (m) => m.onContextLost,
+        (m) => m.onContextRestored,
+        (m) => m.onProjectionChanged,
+      ];
+      for (final (index, callback) in callbacks.indexed) {
+        expect(callback(combined), same(callback(app)), reason: '#$index');
+      }
+      expect(combined.onDragStart, same(app.onDragStart));
+      expect(combined.onDrag, same(app.onDrag));
+      expect(combined.onDragEnd, same(app.onDragEnd));
+    });
+  });
+}
+
+/// A plugin whose parameters a test changes.
+class _Rebuilding extends StatefulWidget {
+  const _Rebuilding({required this.layers, super.key});
+
+  final List<Layer> layers;
+
+  @override
+  State<_Rebuilding> createState() => _RebuildingState();
+}
+
+class _RebuildingState extends State<_Rebuilding> {
+  late List<Layer> _layers = widget.layers;
+  MapEventCallback<MapEventIdle>? _onIdle;
+
+  void rebuild({List<Layer>? layers, MapEventCallback<MapEventIdle>? onIdle}) =>
+      setState(() {
+        _layers = layers ?? _layers;
+        _onIdle = onIdle ?? _onIdle;
+      });
+
+  @override
+  Widget build(BuildContext context) =>
+      MapPlugin(layers: _layers, onIdle: _onIdle);
 }

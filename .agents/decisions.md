@@ -276,7 +276,7 @@ Each entry: the decision, then why.
 - **Plugins are widgets in `MapLibreMap.children`; `MapPlugin` gives them
   the declarative parameters of `MapLibreMap`.** Layers, `on…` callbacks,
   `movements` and `gestures` of every `MapPlugin` are combined into one
-  `MapLibreMap` (`MapLibreMapState.map`), which platforms read instead of
+  `MapLibreMap` (`MapLibreMapState.effectiveWidget`), which platforms read instead of
   `widget` and follow in `didUpdateCallbacks`. Plugin layers go after
   `MapLibreMap.layers` in tree order; input events go to the plugins in
   hit-test order at the pointer (a drag to the plugins at its start), then

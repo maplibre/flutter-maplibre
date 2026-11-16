@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:maplibre_platform_interface/maplibre_platform_interface.dart';
 import 'package:maplibre_platform_interface/src/widget/inherited_model.dart';
@@ -23,9 +24,10 @@ import 'package:maplibre_platform_interface/src/widget/map_plugin_registry.dart'
 ///   [MapEventDragStart], which the callbacks after it can read with
 ///   `defaultPrevented`. The other events go to every plugin, in tree order,
 ///   and then to [MapLibreMap].
-/// - [movements] and [gestures] can only turn movements and gestures off:
-///   the map allows what [MapOptions.movements] and [MapOptions.gestures]
-///   and every plugin allow.
+/// - [movements] and [gestures] can only turn movements and gestures of the
+///   user off: the gestures do what [MapOptions.movements] and
+///   [MapOptions.gestures] and every plugin allow. Camera calls are not
+///   limited.
 ///
 /// A plugin fills the map and lays out [child] at its top left, with at
 /// most the size of the map.
@@ -51,9 +53,10 @@ import 'package:maplibre_platform_interface/src/widget/map_plugin_registry.dart'
 ///   Widget build(BuildContext context) => MapPlugin(
 ///     onClick: (event) => setState(() => _points.add(event.point)),
 ///     layers: [
-///       PolylineLayer(
-///         polylines: [Feature(geometry: LineString.from(_points))],
-///       ),
+///       if (_points.length > 1)
+///         PolylineLayer(
+///           polylines: [Feature(geometry: LineString.from(_points))],
+///         ),
 ///     ],
 ///   );
 /// }
@@ -103,12 +106,15 @@ class MapPlugin extends StatefulWidget {
   /// Layers that show above [MapLibreMap.layers], see [MapLibreMap.layers].
   final List<Layer> layers;
 
-  /// The movements that the plugin allows. The map only moves the ways that
-  /// [MapOptions.movements] and every plugin allow, so a plugin can stop
-  /// the user from rotating the map while it is shown, for example.
+  /// The movements that the plugin allows the gestures of the user. They
+  /// only move the map the ways that [MapOptions.movements] and every
+  /// plugin allow, so a plugin can stop the user from rotating the map
+  /// while it is shown, for example. Camera calls such as
+  /// [MapController.animateCamera] still move the map in every way.
   final MapMovements movements;
 
-  /// The gestures that the plugin allows, combined like [movements].
+  /// The gestures that the plugin allows, combined like [movements]. The
+  /// [MapGestures.rotateThreshold] of [MapOptions.gestures] stays.
   final MapGestures gestures;
 
   /// See [MapLibreMap.onStyleLoaded]. The plugin is added once the map is
@@ -228,8 +234,61 @@ class _MapPluginState extends State<MapPlugin> implements MapPluginEntry {
   @override
   void didUpdateWidget(covariant MapPlugin oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _registry?.update(this);
+    // The map reads the callbacks from the current widget when it calls
+    // them, so it only needs to know which ones are set.
+    if (_shapeChanged(oldWidget, widget)) {
+      _registry?.update(this, structural: true);
+    } else if (!_sameLayers(oldWidget.layers, widget.layers)) {
+      _registry?.update(this, structural: false);
+    }
   }
+
+  static bool _sameLayers(List<Layer> a, List<Layer> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (!identical(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
+  /// Whether [a] and [b] differ in what the map listens for or allows.
+  static bool _shapeChanged(MapPlugin a, MapPlugin b) =>
+      a.movements != b.movements ||
+      a.gestures != b.gestures ||
+      !listEquals(_callbacksSet(a), _callbacksSet(b));
+
+  static List<bool> _callbacksSet(MapPlugin p) => [
+    p.onStyleLoaded != null,
+    p.onClick != null,
+    p.onDoubleClick != null,
+    p.onSecondaryClick != null,
+    p.onLongClick != null,
+    p.onDragStart != null,
+    p.onDrag != null,
+    p.onDragEnd != null,
+    p.onPointerMove != null,
+    p.onPointerLeave != null,
+    p.onCameraMoveStart != null,
+    p.onCameraMove != null,
+    p.onCameraMoveEnd != null,
+    p.onIdle != null,
+    p.onError != null,
+    p.onStyleImageMissing != null,
+    p.onLoadingStarted != null,
+    p.onLoadingFinished != null,
+    p.onSourceChanged != null,
+    p.onTile != null,
+    p.onRenderFrame != null,
+    p.onRenderMap != null,
+    p.onGlyphs != null,
+    p.onSprite != null,
+    p.onRenderingChanged != null,
+    p.onResize != null,
+    p.onContextLost != null,
+    p.onContextRestored != null,
+    p.onProjectionChanged != null,
+  ];
 
   @override
   void activate() {

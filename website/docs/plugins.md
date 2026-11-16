@@ -29,7 +29,7 @@ Every widget below the map can call these:
 
 | Call                                                | Returns                                         | The widget rebuilds when             |
 | --------------------------------------------------- | ----------------------------------------------- | ------------------------------------ |
-| `MapController.of(context)` / `maybeOf`             | The controller: camera moves, queries, the style | The controller, options or style change |
+| `MapController.of(context)` / `maybeOf`             | The controller: camera moves, queries, the style | The controller, options, style or attributions change |
 | `CameraPosition.of(context)` / `maybeOf`            | The current camera                              | The camera moves                     |
 | `MapOptions.of(context)` / `maybeOf`                | The `MapLibreMap.options`                       | The options change                   |
 
@@ -37,6 +37,9 @@ Only `CameraPosition.of` rebuilds the widget while the camera moves. Use it
 when a widget shows something that depends on the camera, such as a
 position on the screen. Use `MapController.of` alone for a widget that only
 calls the controller, such as a button.
+
+Changes inside the style, such as added layers or sources, don't rebuild
+widgets. A widget that shows them listens to the style itself.
 
 ### Draw over the map
 
@@ -65,12 +68,13 @@ class _MeasureLineState extends State<MeasureLine> {
     onClick: (event) => setState(() => _points.add(event.point)),
     // Shown above the layers of MapLibreMap.
     layers: [
-      PolylineLayer(polylines: [Feature(geometry: LineString.from(_points))]),
+      if (_points.length > 1)
+        PolylineLayer(polylines: [Feature(geometry: LineString.from(_points))]),
       CircleLayer(
         points: [for (final point in _points) Feature(geometry: Point(point))],
       ),
     ],
-    // The map doesn't rotate while the plugin is shown.
+    // The user can't rotate the map while the plugin is shown.
     movements: const MapMovements(rotate: false),
     // A Flutter widget over the map, laid out like a widget in children.
     child: const Align(alignment: Alignment.topCenter, child: Text('Tap to measure')),
@@ -92,8 +96,9 @@ The map combines every `MapPlugin` with its own parameters:
   callbacks after it see that in `defaultPrevented`.
 - **Other events**, such as camera moves, style loads and errors, go to every
   plugin and then to `MapLibreMap`.
-- **Movements and gestures** of a plugin can only turn things off: the map
-  moves only the ways that `MapOptions` and every plugin allow.
+- **Movements and gestures** of a plugin can only turn things off: the
+  user's gestures move the map only the ways that `MapOptions` and every
+  plugin allow. Camera calls, such as `animateCamera`, are not limited.
 
 A `MapPlugin` fills the map and never takes a pointer itself, so the map
 still gets the pointers its `child` lets through. Wrap it in a `Positioned`
@@ -105,11 +110,12 @@ to receive the taps of only a part of the map.
 and the built-in widgets don't overlap. See
 [User Interface](ui.md#placing-widgets).
 
-## Existing plugins
+## Packages that extend maplibre
 
-| Package                                                                    | What it does                                                                                                              |
-| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| [maplibre_geolocator](https://pub.dev/packages/maplibre_geolocator)        | Turns the positions of [geolocator](https://pub.dev/packages/geolocator) into the stream of a [UserLocationLayer](user-location.md). |
-| [flutter_map_maplibre](https://pub.dev/packages/flutter_map_maplibre)      | Uses the layers of [flutter_map](https://pub.dev/packages/flutter_map) on a MapLibre map, and a MapLibre map in flutter_map. |
+| Package                                                               | What it does                                                                                                                                   |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| [maplibre_geolocator](https://pub.dev/packages/maplibre_geolocator)   | Turns the positions of [geolocator](https://pub.dev/packages/geolocator) into the location stream of the [UserLocationLayer](user-location.md) plugin. |
+| [flutter_map_maplibre](https://pub.dev/packages/flutter_map_maplibre) | Shows a MapLibre map with vector tiles in [flutter_map](https://pub.dev/packages/flutter_map). Its current release needs maplibre 0.3.          |
 
-Built a plugin? Open a pull request to add it here.
+Built a plugin or another package for maplibre? Open a pull request to add
+it here.

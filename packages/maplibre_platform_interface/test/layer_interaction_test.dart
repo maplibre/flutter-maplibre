@@ -162,6 +162,9 @@ class _Style implements StyleController {
   late final StyleSources sources;
 
   @override
+  List<String> get attributions => const [];
+
+  @override
   void batch(void Function() updates) => updates();
 
   @override

@@ -77,6 +77,20 @@ void main() {
       expect(b.bottom, 600);
     });
 
+    testWidgets('lays out a child that expands', (tester) async {
+      await pump(tester, const [
+        MapAlign(
+          alignment: Alignment.topLeft,
+          children: [
+            SizedBox(key: ValueKey('a'), width: 10, height: 10),
+            Align(child: SizedBox(key: ValueKey('b'), width: 10, height: 10)),
+          ],
+        ),
+      ]);
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const ValueKey('b')), findsOneWidget);
+    });
+
     testWidgets('maybeOf tells the widgets inside', (tester) async {
       Alignment? inside;
       Alignment? outside;
