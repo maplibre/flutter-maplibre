@@ -17,8 +17,8 @@ class MapPluginRegistry {
   MapPluginRegistry(this.onChanged);
 
   /// Called once after a frame in which the plugins changed. `structural`
-  /// is false when only the layers of plugins changed, and true when
-  /// plugins came or went, or changed their callbacks or limits.
+  /// is false when only the layers or the order of plugins changed, and true
+  /// when plugins came or went, or changed their callbacks or limits.
   final void Function({required bool structural}) onChanged;
 
   final _entries = <MapPluginEntry>{};
@@ -39,6 +39,10 @@ class MapPluginRegistry {
   /// [structural].
   void update(MapPluginEntry entry, {required bool structural}) =>
       _changed(structural: structural);
+
+  /// Has the map find the order of the plugins again, as they may have
+  /// moved in the tree without a change of their own.
+  void checkOrder() => _changed(structural: false);
 
   /// Removes [entry], which is about to be unmounted.
   void remove(MapPluginEntry entry) {

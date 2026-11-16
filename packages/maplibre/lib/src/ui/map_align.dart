@@ -23,8 +23,9 @@ import 'package:maplibre/maplibre.dart';
 /// )
 /// ```
 ///
-/// Widgets of plugins can do the same with [MapAlign.maybeOf]. A child that
-/// expands, such as an [Align], takes the space that the others leave.
+/// Widgets of plugins can do the same with [MapAlign.maybeOf]. Each child
+/// gets its own size. Wrap a child that expands, such as an [Align], in a
+/// [Flexible], so that it takes the space that the others leave.
 ///
 /// {@category UI}
 class MapAlign extends StatelessWidget {
@@ -83,9 +84,7 @@ class MapAlign extends StatelessWidget {
                   ? CrossAxisAlignment.end
                   : CrossAxisAlignment.center,
               spacing: spacing,
-              // Loose and bounded, so that a child that expands, such as an
-              // Align, takes the space left instead of failing.
-              children: [for (final child in children) Flexible(child: child)],
+              children: children,
             ),
           ),
         ),

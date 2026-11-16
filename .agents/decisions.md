@@ -300,7 +300,8 @@ Each entry: the decision, then why.
   notify, as apps change them every frame and every `StyleController.of`
   widget would rebuild with them. The map counts the notifications into the
   model, after the frame when they come while the tree builds (annotation
-  layers change there).
+  layers change there). Only the model rebuilds for them (a
+  `ValueListenableBuilder` around it), not the platform widget.
 - **`MapOptions.style` is a sealed `MapStyle` and declarative; there is no
   `setStyle`.** Backends switch on the type instead of guessing from the
   string, and a changed `style` loads the new style.

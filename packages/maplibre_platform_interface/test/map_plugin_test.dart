@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:maplibre_platform_interface/maplibre_platform_interface.dart';
 import 'package:maplibre_platform_interface/src/layer/annotation_manager.dart';
 import 'package:maplibre_platform_interface/src/widget/inherited_model.dart';
+import 'package:maplibre_platform_interface/src/widget/map_plugin.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 const _size = Size(800, 600);
@@ -440,6 +441,19 @@ void main() {
       expect(platform.state.annotationLayerId(second), isNull);
     });
 
+    testWidgets('follow keyed plugins that swap places', (tester) async {
+      final first = _PointLayer(list: [_point(10, 0)]);
+      final second = _PointLayer(list: [_point(20, 0)]);
+      final a = MapPlugin(key: const ValueKey('a'), layers: [first]);
+      final b = MapPlugin(key: const ValueKey('b'), layers: [second]);
+      await pumpMap(tester, children: [a, b]);
+      expect(platform.state.combined.layers, [first, second]);
+      // The same widgets, so no plugin changes itself.
+      await pumpMap(tester, children: [b, a]);
+      await tester.pump();
+      expect(platform.state.combined.layers, [second, first]);
+    });
+
     testWidgets('report taps like the layers of the map', (tester) async {
       await pumpMap(
         tester,
@@ -486,6 +500,44 @@ void main() {
       await drag(tester, const Offset(300, 300), const Offset(100, 0));
       expect(platform.camera.panned, Offset.zero);
     });
+  });
+
+  test('the callback list of a plugin covers every callback', () {
+    void onEvent(Object? _) {}
+    final plugin = MapPlugin(
+      onStyleLoaded: onEvent,
+      onClick: onEvent,
+      onDoubleClick: onEvent,
+      onSecondaryClick: onEvent,
+      onLongClick: onEvent,
+      onDragStart: onEvent,
+      onDrag: onEvent,
+      onDragEnd: onEvent,
+      onPointerMove: onEvent,
+      onPointerLeave: onEvent,
+      onCameraMoveStart: onEvent,
+      onCameraMove: onEvent,
+      onCameraMoveEnd: onEvent,
+      onIdle: onEvent,
+      onError: onEvent,
+      onStyleImageMissing: onEvent,
+      onLoadingStarted: onEvent,
+      onLoadingFinished: onEvent,
+      onSourceChanged: onEvent,
+      onTile: onEvent,
+      onRenderFrame: onEvent,
+      onRenderMap: onEvent,
+      onGlyphs: onEvent,
+      onSprite: onEvent,
+      onRenderingChanged: onEvent,
+      onResize: onEvent,
+      onContextLost: onEvent,
+      onContextRestored: onEvent,
+      onProjectionChanged: onEvent,
+    );
+    // A callback missing in the list wouldn't make the map listen for it.
+    expect(mapPluginCallbacksSet(plugin), everyElement(isTrue));
+    expect(mapPluginCallbacksSet(const MapPlugin()), everyElement(isFalse));
   });
 
   group('rebuilds', () {

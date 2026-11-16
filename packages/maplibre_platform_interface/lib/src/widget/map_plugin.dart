@@ -256,39 +256,7 @@ class _MapPluginState extends State<MapPlugin> implements MapPluginEntry {
   static bool _shapeChanged(MapPlugin a, MapPlugin b) =>
       a.movements != b.movements ||
       a.gestures != b.gestures ||
-      !listEquals(_callbacksSet(a), _callbacksSet(b));
-
-  static List<bool> _callbacksSet(MapPlugin p) => [
-    p.onStyleLoaded != null,
-    p.onClick != null,
-    p.onDoubleClick != null,
-    p.onSecondaryClick != null,
-    p.onLongClick != null,
-    p.onDragStart != null,
-    p.onDrag != null,
-    p.onDragEnd != null,
-    p.onPointerMove != null,
-    p.onPointerLeave != null,
-    p.onCameraMoveStart != null,
-    p.onCameraMove != null,
-    p.onCameraMoveEnd != null,
-    p.onIdle != null,
-    p.onError != null,
-    p.onStyleImageMissing != null,
-    p.onLoadingStarted != null,
-    p.onLoadingFinished != null,
-    p.onSourceChanged != null,
-    p.onTile != null,
-    p.onRenderFrame != null,
-    p.onRenderMap != null,
-    p.onGlyphs != null,
-    p.onSprite != null,
-    p.onRenderingChanged != null,
-    p.onResize != null,
-    p.onContextLost != null,
-    p.onContextRestored != null,
-    p.onProjectionChanged != null,
-  ];
+      !listEquals(mapPluginCallbacksSet(a), mapPluginCallbacksSet(b));
 
   @override
   void activate() {
@@ -309,3 +277,38 @@ class _MapPluginState extends State<MapPlugin> implements MapPluginEntry {
   Widget build(BuildContext context) =>
       MapPluginRenderWidget(entry: this, child: widget.child);
 }
+
+/// Which callbacks of [p] are set, one entry for every callback of
+/// [MapPlugin]. The map only needs to know again when this changes.
+@visibleForTesting
+List<bool> mapPluginCallbacksSet(MapPlugin p) => [
+  p.onStyleLoaded != null,
+  p.onClick != null,
+  p.onDoubleClick != null,
+  p.onSecondaryClick != null,
+  p.onLongClick != null,
+  p.onDragStart != null,
+  p.onDrag != null,
+  p.onDragEnd != null,
+  p.onPointerMove != null,
+  p.onPointerLeave != null,
+  p.onCameraMoveStart != null,
+  p.onCameraMove != null,
+  p.onCameraMoveEnd != null,
+  p.onIdle != null,
+  p.onError != null,
+  p.onStyleImageMissing != null,
+  p.onLoadingStarted != null,
+  p.onLoadingFinished != null,
+  p.onSourceChanged != null,
+  p.onTile != null,
+  p.onRenderFrame != null,
+  p.onRenderMap != null,
+  p.onGlyphs != null,
+  p.onSprite != null,
+  p.onRenderingChanged != null,
+  p.onResize != null,
+  p.onContextLost != null,
+  p.onContextRestored != null,
+  p.onProjectionChanged != null,
+];

@@ -407,5 +407,17 @@ final bearing = MapController.of(context).getCamera().bearing;
 final bearing = CameraPosition.of(context).bearing;
 ```
 
+A widget that shows what the style has, such as its attributions, layers
+or sources, used to update with every camera frame through
+`MapController.of(context).style`. It now updates only when the style
+changes, if it reads the style with `StyleController.of(context)`:
+
+```dart
+// 0.3
+final attributions = MapController.of(context).style?.attributions;
+// 0.4
+final attributions = StyleController.maybeOf(context)?.attributions;
+```
+
 Widgets in `children` can also add layers, callbacks and limits to the map
 with `MapPlugin`, see [Plugins](../plugins.md).

@@ -83,6 +83,11 @@ abstract class MapLibreMapState extends State<MapLibreMap>
     super.didUpdateWidget(oldWidget);
     _annotations.update(effectiveWidget.layers);
     if (oldWidget.paused != widget.paused) _updateRenderingPaused();
+    // Plugins among the new children may have moved.
+    if (!identical(oldWidget.children, widget.children) &&
+        _plugins.entries.length > 1) {
+      _plugins.checkOrder();
+    }
     didUpdateCallbacks();
   }
 
@@ -692,9 +697,10 @@ abstract class MapLibreMapState extends State<MapLibreMap>
   void _onPluginsChanged({required bool structural}) {
     if (!mounted) return;
     final layerFlags = _layerFlags;
-    // Only plugins that come, go or change what they listen for need the
-    // walk of the tree, the platform and a rebuild.
-    if (structural) _pluginOrder = _pluginsInTreeOrder();
+    // The walk also finds plugins that moved in the tree. Only plugins that
+    // come, go or change what they listen for need the platform and a
+    // rebuild.
+    _pluginOrder = _pluginsInTreeOrder();
     _pluginsVersion++;
     _annotations.update(effectiveWidget.layers);
     if (structural) didUpdateCallbacks();
@@ -968,7 +974,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
   StyleController? _listenedStyle;
 
   /// Counts the notifications of [style] for [StyleController.of].
-  var _styleRevision = 0;
+  final ValueNotifier<int> _styleRevision = ValueNotifier(0);
 
   void _listenToStyle() {
     final style = this.style;
@@ -1004,13 +1010,21 @@ abstract class MapLibreMapState extends State<MapLibreMap>
   /// frame if the style changed while the tree builds.
   void _onStyleChanged() {
     if (!mounted) return;
-    _styleRevision++;
-    _onStyleCallbacksChanged();
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      // The style changed while the tree builds, as annotation layers do.
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _styleRevision.value++;
+      });
+    } else {
+      _styleRevision.value++;
+    }
   }
 
   @override
   void dispose() {
     _listenedStyle?.removeListener(_onStyleChanged);
+    _styleRevision.dispose();
     _styleLayers?.callbacksChanged.removeListener(_onStyleCallbacksChanged);
     _plugins.dispose();
     super.dispose();
@@ -1072,14 +1086,20 @@ abstract class MapLibreMapState extends State<MapLibreMap>
                     : null,
                 child: platformWidget,
               ),
-            MapLibreInheritedModel(
-              mapController: this,
-              cameraPosition: camera,
-              options: options,
-              style: style,
-              styleRevision: _styleRevision,
-              renderingPaused: _renderingPaused,
-              plugins: _plugins,
+            // Only the model rebuilds when the style notifies.
+            ValueListenableBuilder(
+              valueListenable: _styleRevision,
+              builder: (context, styleRevision, children) =>
+                  MapLibreInheritedModel(
+                    mapController: this,
+                    cameraPosition: camera,
+                    options: options,
+                    style: style,
+                    styleRevision: styleRevision,
+                    renderingPaused: _renderingPaused,
+                    plugins: _plugins,
+                    child: children!,
+                  ),
               child: isInitialized
                   ? Stack(key: _childrenKey, children: widget.children)
                   : const SizedBox.shrink(),

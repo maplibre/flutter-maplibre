@@ -77,18 +77,46 @@ void main() {
       expect(b.bottom, 600);
     });
 
-    testWidgets('lays out a child that expands', (tester) async {
+    testWidgets('lays out a child that expands in a Flexible', (tester) async {
       await pump(tester, const [
         MapAlign(
           alignment: Alignment.topLeft,
           children: [
             SizedBox(key: ValueKey('a'), width: 10, height: 10),
-            Align(child: SizedBox(key: ValueKey('b'), width: 10, height: 10)),
+            Flexible(
+              child: Align(
+                child: SizedBox(key: ValueKey('b'), width: 10, height: 10),
+              ),
+            ),
           ],
         ),
       ]);
       expect(tester.takeException(), isNull);
       expect(find.byKey(const ValueKey('b')), findsOneWidget);
+    });
+
+    testWidgets('gives each child its own size', (tester) async {
+      tester.view
+        ..physicalSize = const Size(400, 300)
+        ..devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        App(
+          camera: camera,
+          controller: controller,
+          children: const [
+            MapAlign(
+              alignment: Alignment.topLeft,
+              children: [
+                SizedBox(key: ValueKey('tall'), width: 10, height: 150),
+                SizedBox(width: 10, height: 20),
+                SizedBox(width: 10, height: 20),
+              ],
+            ),
+          ],
+        ),
+      );
+      expect(tester.getSize(find.byKey(const ValueKey('tall'))).height, 150);
     });
 
     testWidgets('maybeOf tells the widgets inside', (tester) async {
