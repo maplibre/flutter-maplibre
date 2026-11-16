@@ -352,7 +352,10 @@ void runTests() {
         children: [
           Builder(
             builder: (context) {
-              seen.add(CameraPosition.of(context));
+              // On web, the children build before the map has a camera.
+              if (CameraPosition.maybeOf(context) case final camera?) {
+                seen.add(camera);
+              }
               return const SizedBox.shrink();
             },
           ),
