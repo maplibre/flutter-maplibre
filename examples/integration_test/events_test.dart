@@ -159,17 +159,16 @@ void runTests() {
         ],
       );
       shown.value = true;
-      // The map only listens for frames once the plugin asks for them.
-      await map.pumpUntil(
-        () => frames.isNotEmpty,
-        reason: () => 'waiting for a frame in the plugin',
-      );
+      // The map registers the plugin after the frame that mounts it.
+      await tester.pump();
+      await tester.pump();
+      // A browser only renders a frame when the map changes.
       await map.controller.moveCamera(
         const CameraUpdate.position(center: Geographic(lon: 10, lat: 20)),
       );
       await map.pumpUntil(
-        () => moves.isNotEmpty,
-        reason: () => 'waiting for a camera move in the plugin',
+        () => moves.isNotEmpty && frames.isNotEmpty,
+        reason: () => 'waiting for a camera move and a frame in the plugin',
       );
 
       shown.value = false;
