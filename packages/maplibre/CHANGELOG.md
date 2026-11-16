@@ -45,6 +45,9 @@
   ([#611](https://github.com/maplibre/flutter-maplibre/issues/611)).
 - A pinch rotates the map only after its fingers twist 15 degrees, set with
   `MapGestures.rotateThreshold`.
+- `UserLocationLayer` draws the location with style layers of the map by
+  default, which never trail the camera and lie flat on a tilted map;
+  `UserLocationLayer.marker` also paints it as before or shows a widget.
 
 ### Bug Fixes
 

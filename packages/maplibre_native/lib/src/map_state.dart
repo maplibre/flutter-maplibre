@@ -221,6 +221,8 @@ class MapLibreMapStateNative extends MapLibreMapState {
     _disposed = true;
     _animation?.end(CameraAnimationResult.cancelled);
     _animation = null;
+    // Pending annotation work must not reach the map once it is gone.
+    detachAnnotations();
     style?.dispose();
     _loadingStyle?.dispose();
     _invalidateProjection();

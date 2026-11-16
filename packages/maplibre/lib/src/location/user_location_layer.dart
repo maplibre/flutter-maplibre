@@ -1,23 +1,29 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:maplibre/maplibre.dart';
+import 'package:maplibre/src/location/user_location_style_layers.dart';
 
 /// Meters per degree of latitude.
 const _metersPerDegree = 111320.0;
 
 /// Shows the user location on the [MapLibreMap] by using it in
 /// [MapLibreMap.children], and moves the camera with it while [tracking].
+/// It is a [MapPlugin] of the map.
 ///
 /// The layer takes its locations from a stream, so it works the same on
 /// every platform and with any location source. It asks for no permission;
 /// use a package such as `permission_handler` or `geolocator` for that, and
 /// `maplibre_geolocator` to turn `geolocator` positions into locations.
 ///
-/// A drag or scroll wheel zoom on the map stops the tracking and reports
-/// [UserLocationTracking.none] to [onTrackingChanged].
+/// A gesture that moves the map, such as a drag, a pinch or a scroll wheel
+/// zoom, stops the tracking and reports [UserLocationTracking.none] to
+/// [onTrackingChanged].
+///
+/// [marker] chooses how the location is drawn: with style layers of the map
+/// by default, painted over the map, or as a widget.
 ///
 /// {@category Location}
 class UserLocationLayer extends StatefulWidget {
@@ -30,6 +36,7 @@ class UserLocationLayer extends StatefulWidget {
     this.trackingDuration = const Duration(milliseconds: 500),
     this.color = const Color(0xFF1A73E8),
     this.radius = 8,
+    this.marker = const UserLocationMarker.style(),
     super.key,
   });
 
@@ -55,6 +62,9 @@ class UserLocationLayer extends StatefulWidget {
   /// The radius of the location dot in logical pixels.
   final double radius;
 
+  /// How the location is drawn, with style layers of the map by default.
+  final UserLocationMarker marker;
+
   @override
   State<UserLocationLayer> createState() => _UserLocationLayerState();
 }
@@ -68,8 +78,18 @@ class _UserLocationLayerState extends State<UserLocationLayer> {
   /// started, so [UserLocationLayer.trackingZoom] applies only once.
   var _tracked = false;
 
-  /// Where each pointer on the map went down, to tell a drag from a tap.
-  final _downPositions = <int, Offset>{};
+  /// The PNGs of the heading cone, by color.
+  static final _headingImages = <Color, Future<Uint8List>>{};
+
+  /// The heading cone in [UserLocationLayer.color], once it is drawn.
+  Uint8List? _headingImage;
+  Color? _headingColor;
+
+  /// The layers of a [UserLocationMarkerStyle] and what they were made of,
+  /// so that a rebuild hands the plugin the same layers while nothing
+  /// changed.
+  List<Layer> _layers = const [];
+  Object? _layersInputs;
 
   @override
   void initState() {
@@ -130,35 +150,113 @@ class _UserLocationLayerState extends State<UserLocationLayer> {
     );
   }
 
-  void _stopTracking() {
-    if (_tracking == UserLocationTracking.none) return;
+  /// Stops the tracking when the user moves the map.
+  void _onCameraMoveStart(MapEventCameraMoveStart event) {
+    if (event.reason != CameraChangeReason.gesture ||
+        _tracking == UserLocationTracking.none) {
+      return;
+    }
     _tracking = UserLocationTracking.none;
     widget.onTrackingChanged?.call(UserLocationTracking.none);
   }
 
-  void _onPointerDown(PointerDownEvent event) =>
-      _downPositions[event.pointer] = event.localPosition;
-
-  void _onPointerMove(PointerMoveEvent event) {
-    final down = _downPositions[event.pointer];
-    if (down == null) return;
-    if ((event.localPosition - down).distance > kTouchSlop) _stopTracking();
+  /// Draws the heading cone in [color] for the style layers, once per color.
+  void _loadHeadingImage(Color color) {
+    if (_headingColor == color) return;
+    _headingColor = color;
+    _headingImage = null;
+    final image = _headingImages[color] ??= drawHeadingImage(color);
+    unawaited(
+      image.then(
+        (bytes) {
+          if (mounted && _headingColor == color) {
+            setState(() => _headingImage = bytes);
+          }
+        },
+        onError: (Object error, StackTrace stack) {
+          FlutterError.reportError(
+            FlutterErrorDetails(
+              exception: error,
+              stack: stack,
+              library: 'maplibre',
+              context: ErrorDescription(
+                'while drawing the user location heading',
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
-  void _onPointerEnd(PointerEvent event) =>
-      _downPositions.remove(event.pointer);
-
-  void _onPointerSignal(PointerSignalEvent event) {
-    if (event is PointerScrollEvent || event is PointerScaleEvent) {
-      _stopTracking();
+  /// The layers that show the location with a [UserLocationMarkerStyle].
+  List<Layer> _styleLayers(UserLocationMarkerStyle marker) {
+    final location = _location;
+    if (location == null) return const [];
+    if (marker.showHeading) _loadHeadingImage(widget.color);
+    final inputs = (
+      location,
+      marker,
+      widget.color,
+      widget.radius,
+      _headingImage,
+    );
+    if (inputs != _layersInputs) {
+      _layersInputs = inputs;
+      _layers = userLocationStyleLayers(
+        location: location,
+        marker: marker,
+        color: widget.color,
+        radius: widget.radius,
+        headingImage: _headingImage,
+      );
     }
+    return _layers;
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final marker = widget.marker;
+    return MapPlugin(
+      onCameraMoveStart: _onCameraMoveStart,
+      layers: switch (marker) {
+        final UserLocationMarkerStyle marker => _styleLayers(marker),
+        _ => const [],
+      },
+      child: switch (marker) {
+        UserLocationMarkerStyle() => null,
+        UserLocationMarkerPainted() => _UserLocationPaint(
+          location: _location,
+          color: widget.color,
+          radius: widget.radius,
+        ),
+        UserLocationMarkerWidget(:final builder) => _UserLocationWidget(
+          location: _location,
+          builder: builder,
+        ),
+      },
+    );
+  }
+}
+
+/// Paints [location] over the map. It rebuilds with every frame of a
+/// camera move, unlike the layer around it.
+class _UserLocationPaint extends StatelessWidget {
+  const _UserLocationPaint({
+    required this.location,
+    required this.color,
+    required this.radius,
+  });
+
+  final UserLocation? location;
+  final Color color;
+  final double radius;
 
   @override
   Widget build(BuildContext context) {
     final controller = MapController.maybeOf(context);
     final camera = CameraPosition.maybeOf(context);
-    final location = _location;
+    final location = this.location;
     _UserLocationPainter? painter;
     if (controller != null && camera != null && location != null) {
       final accuracy = location.accuracy;
@@ -179,20 +277,46 @@ class _UserLocationLayerState extends State<UserLocationLayer> {
             ? (points[1] - points[0]).distance
             : 0,
         heading: heading == null ? null : heading - camera.bearing,
-        color: widget.color,
-        radius: widget.radius,
+        color: color,
+        radius: radius,
       );
     }
-    // Translucent, so the map behind still gets every pointer.
-    return Positioned.fill(
-      child: Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerDown: _onPointerDown,
-        onPointerMove: _onPointerMove,
-        onPointerUp: _onPointerEnd,
-        onPointerCancel: _onPointerEnd,
-        onPointerSignal: _onPointerSignal,
-        child: IgnorePointer(child: CustomPaint(painter: painter)),
+    return IgnorePointer(
+      child: CustomPaint(painter: painter, size: Size.infinite),
+    );
+  }
+}
+
+/// Shows the widget of [builder] centered on [location]. It rebuilds with
+/// every frame of a camera move, unlike the layer around it.
+class _UserLocationWidget extends StatelessWidget {
+  const _UserLocationWidget({required this.location, required this.builder});
+
+  final UserLocation? location;
+  final Widget Function(BuildContext context, UserLocation location) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = MapController.maybeOf(context);
+    final location = this.location;
+    // Only to rebuild when the camera moves.
+    final camera = CameraPosition.maybeOf(context);
+    if (controller == null || camera == null || location == null) {
+      return const SizedBox.shrink();
+    }
+    final center = controller.toScreenLocation(location.position);
+    return IgnorePointer(
+      child: Stack(
+        children: [
+          Positioned(
+            left: center.dx,
+            top: center.dy,
+            child: FractionalTranslation(
+              translation: const Offset(-0.5, -0.5),
+              child: builder(context, location),
+            ),
+          ),
+        ],
       ),
     );
   }

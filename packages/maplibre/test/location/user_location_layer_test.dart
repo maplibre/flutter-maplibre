@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maplibre/maplibre.dart';
 import 'package:material_ui/material_ui.dart';
@@ -42,6 +41,10 @@ void main() {
                 .map(_toScreen)
                 .toList(),
       );
+      when(() => controller.toScreenLocation(any())).thenAnswer(
+        (invocation) =>
+            _toScreen(invocation.positionalArguments.single as Geographic),
+      );
       when(
         () =>
             controller.animateCamera(any(), animation: any(named: 'animation')),
@@ -54,6 +57,7 @@ void main() {
       WidgetTester tester, {
       UserLocationTracking tracking = UserLocationTracking.none,
       double? trackingZoom,
+      UserLocationMarker marker = const UserLocationMarker.painted(),
     }) => tester.pumpWidget(
       App(
         camera: _camera,
@@ -64,6 +68,7 @@ void main() {
             tracking: tracking,
             trackingZoom: trackingZoom,
             onTrackingChanged: trackingChanges.add,
+            marker: marker,
           ),
         ],
       ),
@@ -81,9 +86,43 @@ void main() {
       ),
     );
 
+    Finder painter() => find.descendant(
+      of: find.byType(UserLocationLayer),
+      matching: find.byType(CustomPaint),
+    );
+
     testWidgets('paints nothing before the first location', (tester) async {
       await pump(tester);
       expect(layer(tester), paintsNothing);
+    });
+
+    testWidgets('paints nothing with style layers', (tester) async {
+      await pump(tester, marker: const UserLocationMarker.style());
+      await add(
+        tester,
+        const UserLocation(position: Geographic(lon: 0.1, lat: 0.05)),
+      );
+      expect(painter(), findsNothing);
+    });
+
+    testWidgets('shows the widget of the marker at the location', (
+      tester,
+    ) async {
+      await pump(
+        tester,
+        marker: UserLocationMarker.widget(
+          (context, location) =>
+              const SizedBox(key: Key('puck'), width: 20, height: 10),
+        ),
+      );
+      await add(
+        tester,
+        const UserLocation(position: Geographic(lon: 0.1, lat: 0.05)),
+      );
+      expect(
+        tester.getCenter(find.byKey(const Key('puck'))),
+        const Offset(500, 250),
+      );
     });
 
     testWidgets('paints the dot at the screen location', (tester) async {
@@ -214,11 +253,25 @@ void main() {
       ).called(1);
     });
 
-    testWidgets('a drag stops the tracking, a tap does not', (tester) async {
+    MapPlugin plugin(WidgetTester tester) => tester.widget(
+      find.descendant(
+        of: find.byType(UserLocationLayer),
+        matching: find.byType(MapPlugin),
+      ),
+    );
+
+    testWidgets('a gesture stops the tracking, a camera call does not', (
+      tester,
+    ) async {
       await pump(tester, tracking: UserLocationTracking.position);
-      await tester.tapAt(const Offset(400, 300));
+      final onCameraMoveStart = plugin(tester).onCameraMoveStart!;
+      onCameraMoveStart(
+        const MapEventCameraMoveStart(reason: CameraChangeReason.programmatic),
+      );
       expect(trackingChanges, isEmpty);
-      await tester.dragFrom(const Offset(400, 300), const Offset(100, 0));
+      onCameraMoveStart(
+        const MapEventCameraMoveStart(reason: CameraChangeReason.gesture),
+      );
       expect(trackingChanges, [UserLocationTracking.none]);
       clearInteractions(controller);
       await add(
@@ -231,12 +284,23 @@ void main() {
       );
     });
 
-    testWidgets('a scroll wheel stops the tracking', (tester) async {
-      await pump(tester, tracking: UserLocationTracking.position);
-      final pointer = TestPointer(1, PointerDeviceKind.mouse);
-      await tester.sendEventToBinding(pointer.hover(const Offset(400, 300)));
-      await tester.sendEventToBinding(pointer.scroll(const Offset(0, -100)));
-      expect(trackingChanges, [UserLocationTracking.none]);
+    testWidgets('hands the plugin style layers only for the style marker', (
+      tester,
+    ) async {
+      await pump(tester, marker: const UserLocationMarker.style());
+      expect(plugin(tester).layers, isEmpty);
+      await add(
+        tester,
+        const UserLocation(position: Geographic(lon: 1, lat: 2), accuracy: 10),
+      );
+      final layers = plugin(tester).layers;
+      expect(layers, hasLength(2));
+      // A rebuild keeps the layers while the location stays.
+      await tester.pump();
+      expect(plugin(tester).layers, same(layers));
+
+      await pump(tester);
+      expect(plugin(tester).layers, isEmpty);
     });
 
     testWidgets('lets pointers through to the map', (tester) async {
