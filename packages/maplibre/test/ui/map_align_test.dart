@@ -119,6 +119,28 @@ void main() {
       expect(tester.getSize(find.byKey(const ValueKey('tall'))).height, 150);
     });
 
+    testWidgets('an item places itself alone and follows a MapAlign', (
+      tester,
+    ) async {
+      const item = MapAlignItem(
+        alignment: Alignment.bottomRight,
+        padding: EdgeInsets.all(20),
+        child: SizedBox(key: ValueKey('item'), width: 10, height: 10),
+      );
+      await pump(tester, const [item]);
+      expect(
+        tester.getRect(find.byKey(const ValueKey('item'))).bottomRight,
+        const Offset(780, 580),
+      );
+      await pump(tester, const [
+        MapAlign(alignment: Alignment.topLeft, children: [item]),
+      ]);
+      expect(
+        tester.getRect(find.byKey(const ValueKey('item'))).topLeft,
+        const Offset(10, 10),
+      );
+    });
+
     testWidgets('maybeOf tells the widgets inside', (tester) async {
       Alignment? inside;
       Alignment? outside;

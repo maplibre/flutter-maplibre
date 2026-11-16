@@ -110,8 +110,9 @@ to receive the taps of only a part of the map.
 
 ### Share a corner with other widgets
 
-`MapAlign` stacks widgets at one place of the map, so that a plugin's button
-and the built-in widgets don't overlap. See
+Wrap a plugin's button in a `MapAlignItem`. Alone, it places the button at
+its own alignment. Inside a `MapAlign`, the group places it next to the
+built-in widgets without overlapping. See
 [User Interface](ui.md#placing-widgets).
 
 ## Packages that extend maplibre

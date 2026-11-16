@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 import 'package:maplibre/maplibre.dart';
-import 'package:maplibre/src/ui/map_align.dart';
 import 'package:maplibre/src/ui/map_button.dart';
 
 /// Display a zoom-in and zoom-out button to the [MapLibreMap] by using it in
@@ -55,8 +54,7 @@ class MapControlButtons extends StatelessWidget {
     final controller = MapController.maybeOf(context);
     if (controller == null) return const SizedBox.shrink();
 
-    return placeOnMap(
-      context,
+    return MapAlignItem(
       alignment: alignment,
       padding: padding,
       child: Column(

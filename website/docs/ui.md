@@ -62,8 +62,19 @@ MapLibreMap(
 )
 ```
 
-Your own widgets can do the same: `MapAlign.maybeOf(context)` returns the
-alignment of the `MapAlign` around a widget, or null if there is none.
+`MapAlign` is the group, and the widgets of this page are its items: alone,
+an item places itself, inside a `MapAlign` the group places it. Make your
+own widgets items with `MapAlignItem`:
+
+```dart
+MapAlignItem(
+  alignment: Alignment.bottomRight,
+  child: MyButton(),
+)
+```
+
+Inside a `MapAlign`, `MapAlignItem` shows `MyButton` where the group puts
+it. Alone, it puts it at the bottom right.
 
 ## Source Attribution
 

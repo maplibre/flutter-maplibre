@@ -2,7 +2,6 @@ import 'dart:ui';
 
 import 'package:flutter/widgets.dart';
 import 'package:maplibre/maplibre.dart';
-import 'package:maplibre/src/ui/map_align.dart';
 import 'package:maplibre/src/ui/map_button.dart';
 
 /// A compass for flutter_map that shows the map rotation and allows to reset
@@ -93,8 +92,7 @@ class MapCompass extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    return placeOnMap(
-      context,
+    return MapAlignItem(
       alignment: alignment,
       padding: padding,
       child: Transform.rotate(

@@ -24,7 +24,8 @@
   its layers, sources or attributions change; `StyleController`,
   `StyleLayers` and `StyleSources` are `Listenable`.
 - `MapAlign` stacks the widgets of `MapLibreMap.children` at one place of
-  the map, so that they don't overlap.
+  the map, so that they don't overlap; `MapAlignItem` makes a widget one
+  that a `MapAlign` places.
 - Annotation layers take an optional `id`, which names their style layer and
   source ([#674](https://github.com/maplibre/flutter-maplibre/issues/674)).
 - `Layer.anchor` places an annotation layer at the top or bottom of the style,

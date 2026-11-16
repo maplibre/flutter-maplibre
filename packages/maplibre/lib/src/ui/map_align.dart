@@ -4,9 +4,11 @@ import 'package:maplibre/maplibre.dart';
 /// Stacks widgets of [MapLibreMap.children] at one [alignment] of the map,
 /// so that several of them share a corner or an edge without overlapping.
 ///
+/// A [MapAlign] places the [MapAlignItem]s in it: its [alignment],
+/// [padding] and [spacing] replace the alignment and padding of each item.
 /// The widgets of this package, such as `MapCompass`, `MapControlButtons`,
-/// `MapScalebar` and `SourceAttribution`, leave out their own `alignment`
-/// and `padding` inside a [MapAlign], which places them instead.
+/// `MapScalebar` and `SourceAttribution`, are such items: alone they place
+/// themselves, inside a [MapAlign] it places them.
 ///
 /// ```dart
 /// MapLibreMap(
@@ -23,7 +25,7 @@ import 'package:maplibre/maplibre.dart';
 /// )
 /// ```
 ///
-/// Widgets of plugins can do the same with [MapAlign.maybeOf]. Each child
+/// Widgets of plugins can do the same with [MapAlignItem]. Each child
 /// gets its own size. Wrap a child that expands, such as an [Align], in a
 /// [Flexible], so that it takes the space that the others leave.
 ///
@@ -103,20 +105,52 @@ class _MapAlignScope extends InheritedWidget {
       alignment != oldWidget.alignment;
 }
 
-/// Places [child], a widget of this package, at [alignment] with [padding]
-/// inside the safe area, or leaves that to the [MapAlign] around it.
-Widget placeOnMap(
-  BuildContext context, {
-  required Alignment alignment,
-  required EdgeInsets padding,
-  required Widget child,
-}) {
-  if (MapAlign.maybeOf(context) != null) return child;
-  final placed = Container(
-    alignment: alignment,
-    padding: padding,
-    child: child,
-  );
-  // The SafeArea keeps the widget visible on screens with rounded corners.
-  return SafeArea(child: placed);
+/// Places [child] at [alignment] with [padding] inside the safe area of the
+/// screen, unless a [MapAlign] around it places it: then it shows [child] as
+/// it is, with the alignment, padding and spacing of that [MapAlign].
+///
+/// The widgets of this package, such as `MapCompass`, use it, so that they
+/// can stand alone in [MapLibreMap.children] or be grouped in a [MapAlign].
+/// Use it for the widgets of plugins the same way.
+///
+/// ```dart
+/// class MyButton extends StatelessWidget {
+///   const MyButton({super.key});
+///
+///   @override
+///   Widget build(BuildContext context) => const MapAlignItem(
+///     alignment: Alignment.bottomRight,
+///     child: Icon(IconData(0xe55c)),
+///   );
+/// }
+/// ```
+///
+/// {@category UI}
+class MapAlignItem extends StatelessWidget {
+  /// Places [child] at [alignment] unless a [MapAlign] places it.
+  const MapAlignItem({
+    required this.alignment,
+    required this.child,
+    this.padding = const EdgeInsets.all(10),
+    super.key,
+  });
+
+  /// Where [child] goes when no [MapAlign] places it.
+  final Alignment alignment;
+
+  /// The space around [child] when no [MapAlign] places it.
+  final EdgeInsets padding;
+
+  /// The widget to place.
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (MapAlign.maybeOf(context) != null) return child;
+    // The SafeArea keeps the widget visible on screens with rounded corners
+    // and next to system bars.
+    return SafeArea(
+      child: Container(alignment: alignment, padding: padding, child: child),
+    );
+  }
 }

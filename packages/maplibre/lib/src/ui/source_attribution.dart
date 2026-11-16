@@ -3,7 +3,6 @@ import 'package:flutter/widgets.dart';
 import 'package:html/dom.dart' as dom;
 import 'package:html/parser.dart' as html_parser;
 import 'package:maplibre/maplibre.dart';
-import 'package:maplibre/src/ui/map_align.dart';
 import 'package:maplibre/src/ui/map_button.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -85,8 +84,7 @@ class _SourceAttributionState extends State<SourceAttribution> {
       ...style.attributions,
     ];
 
-    return placeOnMap(
-      context,
+    return MapAlignItem(
       alignment: widget.alignment,
       padding: widget.padding,
       child: Container(

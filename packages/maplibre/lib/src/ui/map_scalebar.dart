@@ -3,7 +3,6 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:maplibre/maplibre.dart';
-import 'package:maplibre/src/ui/map_align.dart';
 
 /// Display a scalebar to the [MapLibreMap] by using it in
 /// [MapLibreMap.children].
@@ -83,8 +82,7 @@ class MapScalebar extends StatelessWidget {
       lineColor: lineColor,
       textStyle: textStyle,
     );
-    return placeOnMap(
-      context,
+    return MapAlignItem(
       alignment: alignment,
       padding: padding,
       child: CustomPaint(painter: painter, size: Size(painter.width, height)),
