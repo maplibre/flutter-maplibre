@@ -114,13 +114,16 @@ class _MapAlignScope extends InheritedWidget {
 /// Use it for the widgets of plugins the same way.
 ///
 /// ```dart
-/// class MyButton extends StatelessWidget {
-///   const MyButton({super.key});
+/// class MyBadge extends StatelessWidget {
+///   const MyBadge({super.key});
 ///
 ///   @override
 ///   Widget build(BuildContext context) => const MapAlignItem(
 ///     alignment: Alignment.bottomRight,
-///     child: Icon(IconData(0xe55c)),
+///     child: ColoredBox(
+///       color: Color(0xFF3366FF),
+///       child: SizedBox.square(dimension: 24),
+///     ),
 ///   );
 /// }
 /// ```
