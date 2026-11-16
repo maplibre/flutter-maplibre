@@ -23,7 +23,7 @@ class UserLocationStyle with Diagnosticable {
     this.showHeading = true,
     this.icon,
     this.rotateIcon = true,
-  });
+  }) : assert(radius > 0, 'radius must be positive');
 
   /// The color of the dot, of its accuracy circle and of its heading.
   final Color color;
@@ -38,12 +38,19 @@ class UserLocationStyle with Diagnosticable {
   final bool showHeading;
 
   /// The image that replaces the dot, such as an arrow, or null for the dot.
+  ///
+  /// While it turns with the heading, see [rotateIcon], it shows the heading
+  /// instead of the cone.
   final MarkerIcon? icon;
 
-  /// Whether [icon] turns with the heading of the location.
+  /// Whether [icon] turns with the heading of the location. If not, it
+  /// stays upright on the screen.
   final bool rotateIcon;
 
   /// Creates a copy of this style with the given fields replaced.
+  ///
+  /// A null [icon] keeps the icon. To go back to the dot, create a new
+  /// [UserLocationStyle] instead.
   UserLocationStyle copyWith({
     Color? color,
     double? radius,

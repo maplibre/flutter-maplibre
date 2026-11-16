@@ -135,8 +135,9 @@ UserLocationLayer(
   take the color too.
 - `showAccuracy` and `showHeading` hide the accuracy circle and the heading
   cone.
-- `icon` replaces the dot, for example with an arrow, which turns with the
-  heading while `rotateIcon` is set.
+- `icon` replaces the dot, for example with an arrow. While `rotateIcon` is
+  set, it turns with the heading and shows it instead of the cone; otherwise
+  it stays upright on the screen.
 
 The location is drawn with style layers of the map, so the map draws it in
 the same frame as everything else and it never trails the camera. The

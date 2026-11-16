@@ -15,10 +15,6 @@ const _camera = CameraPosition(
   pitch: 0,
 );
 
-/// A screen at 1 px per 0.001 degrees, centered on (0, 0) at (400, 300).
-Offset _toScreen(Geographic point) =>
-    Offset(400 + point.lon * 1000, 300 - point.lat * 1000);
-
 void main() {
   setUpAll(() {
     registerFallbackValue(const CameraUpdate.position());
@@ -35,16 +31,6 @@ void main() {
       controller = MockMapController();
       locations = StreamController<UserLocation>();
       trackingChanges = [];
-      when(() => controller.toScreenLocations(any())).thenAnswer(
-        (invocation) =>
-            (invocation.positionalArguments.single as List<Geographic>)
-                .map(_toScreen)
-                .toList(),
-      );
-      when(() => controller.toScreenLocation(any())).thenAnswer(
-        (invocation) =>
-            _toScreen(invocation.positionalArguments.single as Geographic),
-      );
       when(
         () =>
             controller.animateCamera(any(), animation: any(named: 'animation')),
@@ -58,6 +44,8 @@ void main() {
       UserLocationTracking tracking = UserLocationTracking.none,
       double? trackingZoom,
       UserLocationStyle style = const UserLocationStyle(),
+      LayerAnchor anchor = const LayerAnchor.top(),
+      ValueChanged<UserLocation>? onClick,
     }) => tester.pumpWidget(
       App(
         camera: _camera,
@@ -69,6 +57,8 @@ void main() {
             trackingZoom: trackingZoom,
             onTrackingChanged: trackingChanges.add,
             style: style,
+            anchor: anchor,
+            onClick: onClick,
           ),
         ],
       ),
@@ -202,6 +192,47 @@ void main() {
 
       await pump(tester, style: const UserLocationStyle(showAccuracy: false));
       expect(plugin(tester).layers, hasLength(1));
+    });
+
+    testWidgets('keeps the layers when the parent passes a new onClick', (
+      tester,
+    ) async {
+      final clicks = <UserLocation>[];
+      const location = UserLocation(position: Geographic(lon: 1, lat: 2));
+      // A closure, as apps write it inline, is a new callback per build.
+      // ignore: unnecessary_lambdas
+      await pump(tester, onClick: (location) => clicks.add(location));
+      await add(tester, location);
+      final layers = plugin(tester).layers;
+      // ignore: unnecessary_lambdas
+      await pump(tester, onClick: (location) => clicks.add(location));
+      expect(plugin(tester).layers, same(layers));
+
+      layers.single.onClick!(
+        const LayerFeatureEvent(
+          index: 0,
+          feature: Feature(geometry: Point(Geographic(lon: 1, lat: 2))),
+          geometry: Point(Geographic(lon: 1, lat: 2)),
+          point: Geographic(lon: 1, lat: 2),
+          screenPoint: Offset.zero,
+        ),
+      );
+      expect(clicks, [location]);
+
+      await pump(tester);
+      expect(plugin(tester).layers.single.onClick, isNull);
+    });
+
+    testWidgets('places the layers at the anchor', (tester) async {
+      await pump(tester, anchor: const LayerAnchor.below('labels'));
+      await add(
+        tester,
+        const UserLocation(position: Geographic(lon: 1, lat: 2), accuracy: 10),
+      );
+      expect(
+        plugin(tester).layers.map((layer) => layer.anchor),
+        everyElement(const LayerAnchor.below('labels')),
+      );
     });
 
     testWidgets('lets pointers through to the map', (tester) async {

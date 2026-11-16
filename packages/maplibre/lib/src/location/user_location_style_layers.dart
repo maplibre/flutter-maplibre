@@ -32,20 +32,24 @@ const _headingPixelRatio = 3.0;
 /// location comes.
 ///
 /// [headingImage] is the PNG of the heading cone from [drawHeadingImage], or
-/// null while it is drawn, which leaves the heading out.
+/// null while it is drawn, which leaves the heading out. An icon that turns
+/// with the heading shows it already, so it leaves the cone out too.
+///
+/// [onClick] goes to the dot or the icon. Pass the same callback for every
+/// location, such as a method tear-off, so that the layers compare equal
+/// while nothing else changes.
 List<Layer> userLocationStyleLayers({
   required UserLocation location,
   required UserLocationStyle style,
   LayerAnchor anchor = const LayerAnchor.top(),
-  ValueChanged<UserLocation>? onClick,
+  LayerFeatureCallback? onClick,
   Uint8List? headingImage,
 }) {
-  final UserLocationStyle(:color, :radius) = style;
+  final UserLocationStyle(:color, :radius, :icon, :rotateIcon) = style;
   final points = [Feature(geometry: Point(location.position))];
   final accuracy = location.accuracy;
   final heading = location.heading;
-  void reportClick(LayerFeatureEvent _) => onClick?.call(location);
-  final click = onClick == null ? null : reportClick;
+  final iconShowsHeading = icon != null && rotateIcon;
   return [
     if (style.showAccuracy && accuracy != null && accuracy > 0)
       _AccuracyLayer(
@@ -54,7 +58,10 @@ List<Layer> userLocationStyleLayers({
         radius: accuracyRadius(accuracy, location.position.lat),
         color: color,
       ),
-    if (style.showHeading && heading != null && headingImage != null)
+    if (style.showHeading &&
+        !iconShowsHeading &&
+        heading != null &&
+        headingImage != null)
       _HeadingLayer(
         anchor: anchor,
         points: points,
@@ -63,15 +70,17 @@ List<Layer> userLocationStyleLayers({
         rotate: heading,
         flat: true,
       ),
-    if (style.icon case final icon?)
+    if (icon != null)
       _IconLayer(
         anchor: anchor,
         points: points,
         icon: icon,
         size: 1,
-        rotate: style.rotateIcon ? heading ?? 0 : 0,
+        // An icon that doesn't turn with the heading stays upright on the
+        // screen, whatever the bearing of the map.
+        rotate: rotateIcon ? heading ?? 0 : null,
         flat: false,
-        onClick: click,
+        onClick: onClick,
       )
     else
       _DotLayer(
@@ -79,7 +88,7 @@ List<Layer> userLocationStyleLayers({
         points: points,
         radius: radius,
         color: color,
-        onClick: click,
+        onClick: onClick,
       ),
   ];
 }
@@ -209,8 +218,10 @@ final class _DotLayer extends _MarkerLayer {
   int get hashCode => Object.hash(super.hashCode, radius, color, onClick);
 }
 
-/// An image at the location that turns with the map, the heading cone or
-/// the icon that replaces the dot. A [flat] image lies on the map.
+/// An image at the location, the heading cone or the icon that replaces the
+/// dot. It turns with the map to [rotate] degrees from north, or stays
+/// upright on the screen while [rotate] is null. A [flat] image lies on the
+/// map.
 class _IconLayer extends _MarkerLayer {
   const _IconLayer({
     required super.anchor,
@@ -225,7 +236,7 @@ class _IconLayer extends _MarkerLayer {
   @override
   final MarkerIcon icon;
   final double size;
-  final double rotate;
+  final double? rotate;
   final bool flat;
 
   @override
@@ -235,8 +246,12 @@ class _IconLayer extends _MarkerLayer {
         sourceId: sourceId,
         maxZoom: maxZoom,
         iconSize: .literal(size),
-        iconRotate: .literal(rotate),
-        iconRotationAlignment: const .literal(IconRotationAlignment.map),
+        iconRotate: .literal(rotate ?? 0),
+        iconRotationAlignment: .literal(
+          rotate == null
+              ? IconRotationAlignment.viewport
+              : IconRotationAlignment.map,
+        ),
         iconPitchAlignment: .literal(
           flat ? IconPitchAlignment.map : IconPitchAlignment.viewport,
         ),
@@ -259,6 +274,11 @@ class _IconLayer extends _MarkerLayer {
 }
 
 /// The heading cone, an [_IconLayer] of its own type.
+///
+/// The annotation manager matches the layers of a new list to its current
+/// ones by their type, not by an id, as these layers have none. A type of
+/// its own keeps the cone matched to the cone, and the icon to the icon, on
+/// every location, so that they are updated instead of replaced.
 final class _HeadingLayer extends _IconLayer {
   const _HeadingLayer({
     required super.anchor,

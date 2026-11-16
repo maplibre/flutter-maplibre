@@ -485,13 +485,11 @@ void runTests() {
         map.center,
         (features) => {for (final f in features) f.layerId}.length == 3,
       );
-      expect(
-        map.style.layers
-            .map((layer) => layer.id)
-            .skip(1)
-            .map((id) => id.split('-')[1]),
-        ['circle', 'symbol', 'circle'],
-      );
+      expect(map.style.layers.skip(1).map((layer) => layer.type), [
+        'circle',
+        'symbol',
+        'circle',
+      ]);
       // 500 m are about 105 px at zoom 14 on the equator, so the accuracy
       // circle covers a point 40 px away, which the dot and the heading,
       // 32 px long, do not.

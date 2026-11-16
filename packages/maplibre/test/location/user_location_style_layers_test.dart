@@ -89,30 +89,75 @@ void main() {
       sourceId: 'p-icon',
     ) as SymbolStyleLayer;
     expect(symbol.iconRotate, const Expression.literal(45));
+    expect(
+      symbol.iconRotationAlignment,
+      const Expression.literal(IconRotationAlignment.map),
+    );
     final upright = layers(
       rotateIcon: false,
     ).single.createStyleLayer(id: 'p', sourceId: 'p') as SymbolStyleLayer;
     expect(upright.iconRotate, const Expression.literal(0));
+    expect(
+      upright.iconRotationAlignment,
+      const Expression.literal(IconRotationAlignment.viewport),
+    );
   });
 
-  test('a tap on the dot reports the location', () {
-    final clicks = <UserLocation>[];
-    const location = UserLocation(position: position);
-    final dot = userLocationStyleLayers(
-      location: location,
-      style: const UserLocationStyle(),
-      onClick: clicks.add,
-    ).single;
-    dot.onClick!(
-      const LayerFeatureEvent(
-        index: 0,
-        feature: Feature(geometry: Point(position)),
-        geometry: Point(position),
-        point: position,
-        screenPoint: Offset.zero,
+  test('a turning icon shows the heading instead of the cone', () {
+    const icon = MarkerIcon.named('arrow');
+    List<String> types({required bool rotateIcon}) => [
+      for (final layer in userLocationStyleLayers(
+        location: const UserLocation(position: position, heading: 45),
+        style: UserLocationStyle(icon: icon, rotateIcon: rotateIcon),
+        headingImage: Uint8List(1),
+      ))
+        layer.createStyleLayer(id: 'l', sourceId: 's').type,
+    ];
+    expect(types(rotateIcon: true), ['symbol']);
+    expect(types(rotateIcon: false), ['symbol', 'symbol']);
+  });
+
+  test('the dot or the icon gets the click callback', () {
+    void onClick(LayerFeatureEvent event) {}
+    for (final style in const [
+      UserLocationStyle(),
+      UserLocationStyle(icon: MarkerIcon.named('arrow')),
+    ]) {
+      final layers = userLocationStyleLayers(
+        location: const UserLocation(position: position, accuracy: 20),
+        style: style,
+        onClick: onClick,
+      );
+      expect(layers.first.onClick, isNull);
+      expect(layers.last.onClick, onClick);
+    }
+  });
+
+  test('places every layer at the anchor', () {
+    final layers = userLocationStyleLayers(
+      location: const UserLocation(
+        position: position,
+        accuracy: 20,
+        heading: 90,
       ),
+      style: const UserLocationStyle(),
+      anchor: const LayerAnchor.below('labels'),
+      headingImage: Uint8List(1),
     );
-    expect(clicks, [location]);
+    expect(layers, hasLength(3));
+    expect(
+      layers.map((layer) => layer.anchor),
+      everyElement(const LayerAnchor.below('labels')),
+    );
+  });
+
+  test('draws the heading cone as a PNG', () async {
+    final png = await drawHeadingImage(_color);
+    expect(png.sublist(1, 4), 'PNG'.codeUnits);
+  });
+
+  test('UserLocationStyle asserts a positive radius', () {
+    expect(() => UserLocationStyle(radius: -1), throwsAssertionError);
   });
 
   test('the accuracy radius is in meters at every zoom', () {

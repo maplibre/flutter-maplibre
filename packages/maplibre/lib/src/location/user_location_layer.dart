@@ -78,24 +78,27 @@ class _UserLocationLayerState extends State<UserLocationLayer> {
   /// started, so [UserLocationLayer.trackingZoom] applies only once.
   var _tracked = false;
 
-  /// The PNGs of the heading cone, by color.
+  /// The PNGs of the heading cone, by color, the most recently used last.
   static final _headingImages = <Color, Future<Uint8List>>{};
+
+  /// How many colors [_headingImages] keeps.
+  static const _maxHeadingImages = 8;
 
   /// The heading cone in the color of [UserLocationLayer.style], once it is
   /// drawn.
   Uint8List? _headingImage;
   Color? _headingColor;
 
-  /// The layers of the location and what they were made of,
-  /// so that a rebuild hands the plugin the same layers while nothing
-  /// changed.
-  List<Layer> _layerList = const [];
-  Object? _layersInputs;
+  /// The layers that show the location, which change only with the location,
+  /// the widget and the heading image, so that a rebuild of the parent hands
+  /// the plugin the same layers.
+  List<Layer> _layers = const [];
 
   @override
   void initState() {
     super.initState();
     _subscribe();
+    _loadHeadingImage();
   }
 
   @override
@@ -110,6 +113,12 @@ class _UserLocationLayerState extends State<UserLocationLayer> {
       _tracked = false;
       _follow();
     }
+    if (widget.style != oldWidget.style ||
+        widget.anchor != oldWidget.anchor ||
+        (widget.onClick == null) != (oldWidget.onClick == null)) {
+      _loadHeadingImage();
+      _updateLayers();
+    }
   }
 
   @override
@@ -121,7 +130,10 @@ class _UserLocationLayerState extends State<UserLocationLayer> {
   void _subscribe() {
     _subscription = widget.locations.listen((location) {
       if (!mounted) return;
-      setState(() => _location = location);
+      setState(() {
+        _location = location;
+        _updateLayers();
+      });
       _follow();
     });
   }
@@ -161,20 +173,43 @@ class _UserLocationLayerState extends State<UserLocationLayer> {
     widget.onTrackingChanged?.call(UserLocationTracking.none);
   }
 
-  /// Draws the heading cone in [color] for the style layers, once per color.
-  void _loadHeadingImage(Color color) {
+  /// Reports a tap on the location. A method, so that the layers of every
+  /// location get the same callback.
+  void _onClick(LayerFeatureEvent event) {
+    if (_location case final location?) widget.onClick?.call(location);
+  }
+
+  /// Draws the heading cone in the color of [UserLocationLayer.style], once
+  /// per color.
+  void _loadHeadingImage() {
+    final style = widget.style;
+    if (!style.showHeading) return;
+    final color = style.color;
     if (_headingColor == color) return;
     _headingColor = color;
     _headingImage = null;
-    final image = _headingImages[color] ??= drawHeadingImage(color);
+    // Reinserting the color makes it the most recently used.
+    final image = _headingImages.remove(color) ?? drawHeadingImage(color);
+    _headingImages[color] = image;
+    while (_headingImages.length > _maxHeadingImages) {
+      _headingImages.remove(_headingImages.keys.first);
+    }
     unawaited(
       image.then(
         (bytes) {
           if (mounted && _headingColor == color) {
-            setState(() => _headingImage = bytes);
+            setState(() {
+              _headingImage = bytes;
+              _updateLayers();
+            });
           }
         },
         onError: (Object error, StackTrace stack) {
+          // A later layer of this color draws it again.
+          if (identical(_headingImages[color], image)) {
+            _headingImages.remove(color);
+          }
+          if (mounted && _headingColor == color) _headingColor = null;
           FlutterError.reportError(
             FlutterErrorDetails(
               exception: error,
@@ -190,33 +225,21 @@ class _UserLocationLayerState extends State<UserLocationLayer> {
     );
   }
 
-  /// The layers that show the location.
-  List<Layer> _layers() {
+  /// Makes the layers that show the location.
+  void _updateLayers() {
     final location = _location;
-    if (location == null) return const [];
-    final style = widget.style;
-    if (style.showHeading) _loadHeadingImage(style.color);
-    final inputs = (
-      location,
-      style,
-      widget.anchor,
-      widget.onClick,
-      _headingImage,
-    );
-    if (inputs != _layersInputs) {
-      _layersInputs = inputs;
-      _layerList = userLocationStyleLayers(
-        location: location,
-        style: style,
-        anchor: widget.anchor,
-        onClick: widget.onClick,
-        headingImage: _headingImage,
-      );
-    }
-    return _layerList;
+    _layers = location == null
+        ? const []
+        : userLocationStyleLayers(
+            location: location,
+            style: widget.style,
+            anchor: widget.anchor,
+            onClick: widget.onClick == null ? null : _onClick,
+            headingImage: _headingImage,
+          );
   }
 
   @override
   Widget build(BuildContext context) =>
-      MapPlugin(onCameraMoveStart: _onCameraMoveStart, layers: _layers());
+      MapPlugin(onCameraMoveStart: _onCameraMoveStart, layers: _layers);
 }
