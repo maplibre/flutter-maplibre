@@ -1,11 +1,13 @@
-# MapLibre Flutter
+<div align="center">
+  <img alt="MapLibre Logo" src="https://maplibre.org/img/maplibre-logos/maplibre-logo-for-light-bg.svg" width="240">
 
-[![Pub Version](https://img.shields.io/pub/v/maplibre)](https://pub.dev/packages/maplibre)
+# Flutter MapLibre
+
+  [![Pub Version](https://img.shields.io/pub/v/maplibre)](https://pub.dev/packages/maplibre)
 [![stars](https://img.shields.io/github/stars/josxha/flutter-maplibre?style=flat&logo=github)](https://github.com/josxha/flutter-maplibre)
 [![likes](https://img.shields.io/pub/likes/maplibre?logo=flutter)](https://pub.dev/packages/maplibre)
 [![Pub Points](https://img.shields.io/pub/points/maplibre)](https://pub.dev/packages/maplibre/score)
 [![Pub Downloads](https://img.shields.io/pub/dm/maplibre)](https://pub.dev/packages/maplibre)
-
 [![codecov](https://codecov.io/gh/josxha/flutter-maplibre/graph/badge.svg?token=3LK7EQMSUM)](https://codecov.io/gh/josxha/flutter-maplibre)
 [![style: very good analysis](https://img.shields.io/badge/style-very_good_analysis-B22C89.svg)](https://pub.dev/packages/very_good_analysis)
 
@@ -14,6 +16,7 @@ web, built on [MapLibre](https://maplibre.org). Show any MapLibre or Mapbox
 compatible style, from any tile provider or your own server. `maplibre` needs
 no API key of its own; keys and fees depend only on the tile provider you
 choose.
+</div>
 
 <p align="center">
   <a href="https://josxha.github.io/flutter-maplibre/demo">
