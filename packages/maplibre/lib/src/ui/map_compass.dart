@@ -97,7 +97,6 @@ class MapCompass extends StatelessWidget {
       context,
       alignment: alignment,
       padding: padding,
-      safeArea: false,
       child: Transform.rotate(
         angle: (-camera.bearing + rotationOffset) * degree2Radian,
         child: MapTapTarget(

@@ -47,6 +47,8 @@
 
 ### Bug Fixes
 
+- `MapCompass` stays inside the safe area of the screen, like the other
+  widgets.
 - Taps, hovers and drags on annotation layers follow the layer when the list
   is reordered, and go to the layer drawn on top
   ([#674](https://github.com/maplibre/flutter-maplibre/issues/674)).

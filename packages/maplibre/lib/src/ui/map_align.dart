@@ -110,7 +110,6 @@ Widget placeOnMap(
   required Alignment alignment,
   required EdgeInsets padding,
   required Widget child,
-  bool safeArea = true,
 }) {
   if (MapAlign.maybeOf(context) != null) return child;
   final placed = Container(
@@ -119,5 +118,5 @@ Widget placeOnMap(
     child: child,
   );
   // The SafeArea keeps the widget visible on screens with rounded corners.
-  return safeArea ? SafeArea(child: placed) : placed;
+  return SafeArea(child: placed);
 }
