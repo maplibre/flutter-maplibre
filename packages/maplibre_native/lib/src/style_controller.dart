@@ -376,7 +376,7 @@ class StyleControllerNative extends StyleController implements StyleBackend {
       return _cachedAttributions;
     }
     _cachedAttributions = attributions;
-    notifyAttributionsChanged();
+    if (!_disposed) notifyAttributionsChanged();
     return attributions;
   }
 
@@ -402,5 +402,6 @@ class StyleControllerNative extends StyleController implements StyleBackend {
     _disposed = true;
     layers.dispose();
     sources.dispose();
+    super.dispose();
   }
 }

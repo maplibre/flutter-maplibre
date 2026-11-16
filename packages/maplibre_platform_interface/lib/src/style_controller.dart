@@ -319,8 +319,9 @@ abstract class StyleController implements Listenable {
   /// https://maplibre.org/maplibre-style-spec/projection/
   void setProjection(Expression<MapProjection> projection);
 
-  /// Clean up resources.
-  void dispose();
+  /// Clean up resources. Implementations call `super.dispose()` last.
+  @mustCallSuper
+  void dispose() => _attributionsChanged.dispose();
 }
 
 /// The map projections of the style spec.

@@ -360,6 +360,7 @@ class StyleControllerWeb extends StyleController implements StyleBackend {
       URL.revokeObjectURL(url);
     }
     _blobUrls.clear();
+    super.dispose();
   }
 
   /// A blob URL of a PNG of the image of [provider].
