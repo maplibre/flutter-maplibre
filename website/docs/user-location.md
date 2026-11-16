@@ -140,7 +140,8 @@ UserLocationLayer(
   it stays upright on the screen.
 
 The location is drawn with style layers of the map, so the map draws it in
-the same frame as everything else and it never trails the camera. The
+the same frame as everything else and it never trails the camera. It moves
+from one location to the next without an animation in between. The
 accuracy circle and the heading lie flat on a tilted map. `anchor` places the
 layers among those of the style, and `onClick` reports taps on the location.
 

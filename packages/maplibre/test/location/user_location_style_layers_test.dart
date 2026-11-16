@@ -37,7 +37,10 @@ void main() {
     );
     expect(accuracy.pitchScale, const Expression.literal(CirclePitchScale.map));
     final heading = layers[1] as SymbolStyleLayer;
-    expect(heading.iconRotate, const Expression.literal(90));
+    expect(heading.iconRotate.toJson(), [
+      'number',
+      ['get', 'heading'],
+    ]);
     expect(
       heading.iconPitchAlignment,
       const Expression.literal(IconPitchAlignment.map),
@@ -88,7 +91,7 @@ void main() {
       id: 'p-icon',
       sourceId: 'p-icon',
     ) as SymbolStyleLayer;
-    expect(symbol.iconRotate, const Expression.literal(45));
+    expect(symbol.iconRotate, isNotNull);
     expect(
       symbol.iconRotationAlignment,
       const Expression.literal(IconRotationAlignment.map),
@@ -163,12 +166,52 @@ void main() {
   test('the accuracy radius is in meters at every zoom', () {
     // At 60 degrees, a pixel at zoom 0 is half the equator's pixel.
     const metersPerPixel = 40075016.686 / 512 / 2;
-    final radius = accuracyRadius(metersPerPixel * 10, 60);
-    final stops = (radius.toJson()! as List).skip(3).toList();
+    expect(accuracyPixels(metersPerPixel * 10, 60), closeTo(10, 1e-6));
+    final stops = (accuracyRadius.toJson()! as List).skip(3).toList();
     expect(stops[0], 0);
-    expect(stops[1] as num, closeTo(10, 1e-6));
+    expect(stops[1], [
+      'number',
+      ['get', 'accuracy'],
+    ]);
     expect(stops[2], 24);
-    expect(stops[3] as num, closeTo(10 * pow(2, 24), 1e-3));
+    expect(stops[3], [
+      '*',
+      [
+        'number',
+        ['get', 'accuracy'],
+      ],
+      pow(2, 24),
+    ]);
+  });
+
+  test('a new location changes only the data of the layers', () {
+    List<Layer> layers(UserLocation location) => userLocationStyleLayers(
+      location: location,
+      style: const UserLocationStyle(),
+      headingImage: Uint8List(1),
+    );
+    final first = layers(
+      const UserLocation(position: position, accuracy: 20, heading: 90),
+    );
+    final second = layers(
+      const UserLocation(
+        position: Geographic(lon: 11, lat: 61),
+        accuracy: 50,
+        heading: 180,
+      ),
+    );
+    for (var i = 0; i < first.length; i++) {
+      expect(
+        first[i].createStyleLayer(id: 'l', sourceId: 's').toJson(),
+        second[i].createStyleLayer(id: 'l', sourceId: 's').toJson(),
+      );
+    }
+    final properties = second.first.list.single.properties;
+    expect(properties['heading'], 180);
+    expect(
+      properties['accuracy'] as num,
+      closeTo(accuracyPixels(50, 61), 1e-9),
+    );
   });
 
   test('UserLocationStyle copies and compares by value', () {

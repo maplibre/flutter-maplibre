@@ -31,6 +31,10 @@ const _headingPixelRatio = 3.0;
 /// type of its own, so that the map keeps their style layers when another
 /// location comes.
 ///
+/// The accuracy and the heading are properties of the feature, which the
+/// style layers read, so a new location only changes data and the style
+/// layers stay the same.
+///
 /// [headingImage] is the PNG of the heading cone from [drawHeadingImage], or
 /// null while it is drawn, which leaves the heading out. An icon that turns
 /// with the heading shows it already, so it leaves the cone out too.
@@ -46,18 +50,23 @@ List<Layer> userLocationStyleLayers({
   Uint8List? headingImage,
 }) {
   final UserLocationStyle(:color, :radius, :icon, :rotateIcon) = style;
-  final points = [Feature(geometry: Point(location.position))];
   final accuracy = location.accuracy;
   final heading = location.heading;
+  final points = [
+    Feature(
+      geometry: Point(location.position),
+      properties: {
+        _accuracyProperty: accuracy == null
+            ? 0
+            : accuracyPixels(accuracy, location.position.lat),
+        _headingProperty: heading ?? 0,
+      },
+    ),
+  ];
   final iconShowsHeading = icon != null && rotateIcon;
   return [
     if (style.showAccuracy && accuracy != null && accuracy > 0)
-      _AccuracyLayer(
-        anchor: anchor,
-        points: points,
-        radius: accuracyRadius(accuracy, location.position.lat),
-        color: color,
-      ),
+      _AccuracyLayer(anchor: anchor, points: points, color: color),
     if (style.showHeading &&
         !iconShowsHeading &&
         heading != null &&
@@ -67,7 +76,7 @@ List<Layer> userLocationStyleLayers({
         points: points,
         icon: MarkerIcon.bytes(headingImage, pixelRatio: _headingPixelRatio),
         size: radius / _headingRadius,
-        rotate: heading,
+        rotates: true,
         flat: true,
       ),
     if (icon != null)
@@ -76,9 +85,7 @@ List<Layer> userLocationStyleLayers({
         points: points,
         icon: icon,
         size: 1,
-        // An icon that doesn't turn with the heading stays upright on the
-        // screen, whatever the bearing of the map.
-        rotate: rotateIcon ? heading ?? 0 : null,
+        rotates: rotateIcon,
         flat: false,
         onClick: onClick,
       )
@@ -93,17 +100,37 @@ List<Layer> userLocationStyleLayers({
   ];
 }
 
-/// The circle radius in pixels of [accuracy] meters at the latitude [lat],
-/// for every zoom: the radius doubles with each zoom level.
-Expression<num> accuracyRadius(double accuracy, double lat) {
+/// The feature property of the accuracy radius in pixels at zoom 0.
+const _accuracyProperty = 'accuracy';
+
+/// The feature property of the heading in degrees.
+const _headingProperty = 'heading';
+
+/// The radius in pixels at zoom 0 of [accuracy] meters at the latitude
+/// [lat].
+double accuracyPixels(double accuracy, double lat) {
   final metersPerPixel =
       _earthCircumference * cos(lat * pi / 180).abs() / _tileSize;
-  final radius = accuracy / max(metersPerPixel, 1e-6);
-  return .interpolate(const .exponential(2), .zoom(), {
-    0: .literal(radius),
-    _maxZoom: .literal(radius * pow(2, _maxZoom)),
-  });
+  return accuracy / max(metersPerPixel, 1e-6);
 }
+
+/// The circle radius of the accuracy at every zoom, from the feature's
+/// radius at zoom 0: the radius doubles with each zoom level.
+final Expression<num> accuracyRadius = Expression.interpolate(
+  const .exponential(2),
+  .zoom(),
+  {
+    0: Expression.get(_accuracyProperty).asNumber(),
+    _maxZoom: Expression.product([
+      Expression.get(_accuracyProperty).asNumber(),
+      Expression.literal(pow(2, _maxZoom)),
+    ]),
+  },
+);
+
+/// The heading of the feature, in degrees from north.
+final Expression<num> _headingRotation = Expression.get(_headingProperty)
+    .asNumber();
 
 /// Draws the heading cone in [color] as a PNG: a cone of 60 degrees that
 /// points up from the center of the image, fading out.
@@ -149,11 +176,9 @@ final class _AccuracyLayer extends _MarkerLayer {
   const _AccuracyLayer({
     required super.anchor,
     required super.points,
-    required this.radius,
     required this.color,
   });
 
-  final Expression<num> radius;
   final Color color;
 
   @override
@@ -162,7 +187,7 @@ final class _AccuracyLayer extends _MarkerLayer {
         id: id,
         sourceId: sourceId,
         maxZoom: maxZoom,
-        radius: radius,
+        radius: accuracyRadius,
         color: .literal(color.withValues(alpha: 0.15)),
         strokeWidth: const .literal(1),
         strokeColor: .literal(color.withValues(alpha: 0.4)),
@@ -172,13 +197,10 @@ final class _AccuracyLayer extends _MarkerLayer {
 
   @override
   bool operator ==(Object other) =>
-      super == other &&
-      other is _AccuracyLayer &&
-      radius == other.radius &&
-      color == other.color;
+      super == other && other is _AccuracyLayer && color == other.color;
 
   @override
-  int get hashCode => Object.hash(super.hashCode, radius, color);
+  int get hashCode => Object.hash(super.hashCode, color);
 }
 
 /// The dot, which faces the viewer.
@@ -219,16 +241,16 @@ final class _DotLayer extends _MarkerLayer {
 }
 
 /// An image at the location, the heading cone or the icon that replaces the
-/// dot. It turns with the map to [rotate] degrees from north, or stays
-/// upright on the screen while [rotate] is null. A [flat] image lies on the
-/// map.
+/// dot. It turns with the map to the heading of the location while it
+/// [rotates], or else stays upright on the screen. A [flat] image lies on
+/// the map.
 class _IconLayer extends _MarkerLayer {
   const _IconLayer({
     required super.anchor,
     required super.points,
     required this.icon,
     required this.size,
-    required this.rotate,
+    required this.rotates,
     required this.flat,
     super.onClick,
   });
@@ -236,7 +258,7 @@ class _IconLayer extends _MarkerLayer {
   @override
   final MarkerIcon icon;
   final double size;
-  final double? rotate;
+  final bool rotates;
   final bool flat;
 
   @override
@@ -246,11 +268,9 @@ class _IconLayer extends _MarkerLayer {
         sourceId: sourceId,
         maxZoom: maxZoom,
         iconSize: .literal(size),
-        iconRotate: .literal(rotate ?? 0),
+        iconRotate: rotates ? _headingRotation : null,
         iconRotationAlignment: .literal(
-          rotate == null
-              ? IconRotationAlignment.viewport
-              : IconRotationAlignment.map,
+          rotates ? IconRotationAlignment.map : IconRotationAlignment.viewport,
         ),
         iconPitchAlignment: .literal(
           flat ? IconPitchAlignment.map : IconPitchAlignment.viewport,
@@ -265,12 +285,12 @@ class _IconLayer extends _MarkerLayer {
       super == other &&
       other is _IconLayer &&
       size == other.size &&
-      rotate == other.rotate &&
+      rotates == other.rotates &&
       flat == other.flat &&
       onClick == other.onClick;
 
   @override
-  int get hashCode => Object.hash(super.hashCode, size, rotate, flat, onClick);
+  int get hashCode => Object.hash(super.hashCode, size, rotates, flat, onClick);
 }
 
 /// The heading cone, an [_IconLayer] of its own type.
@@ -285,7 +305,7 @@ final class _HeadingLayer extends _IconLayer {
     required super.points,
     required super.icon,
     required super.size,
-    required super.rotate,
+    required super.rotates,
     required super.flat,
   });
 }
