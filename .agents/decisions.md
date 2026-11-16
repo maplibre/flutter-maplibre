@@ -523,6 +523,23 @@ Each entry: the decision, then why.
   update per frame re-encodes the data in Dart, parses and indexes it on the
   UI thread (`geojsonSourceDataCreate` is synchronous) and re-tiles the
   source; a paint change does none of that.
+- **`MapOptions.localIdeographFontFamily` is a per-map CSS font-family list,
+  as gl-js's option, and defaults to `'sans-serif'`, as gl-js and MapLibre's
+  iOS and Android SDKs draw CJK locally by default.** Null (`false` to
+  gl-js) or an empty string draws the style's glyphs on every platform. On
+  iOS and macOS the C library's local glyph rasterizer reads its fonts from
+  the `MLNIdeographicFontFamilyName` user default when the session's
+  renderer is created, on its first frame (the C API passes none, see Known
+  gaps), so the Darwin target registers a value just before every session
+  attaches, in the registration domain, which is the process's and never
+  written to disk: the names, or `@NO` for null, since the rasterizer reads
+  the key with `stringArrayForKey:` and is on for any array, even an empty
+  one. A map without the fonts thus never inherits another map's. A generic
+  sans-serif family stands for the system font's family, as MapLibre's iOS
+  and macOS SDKs pass it by default, and the plugin reads it through Core
+  Text, which any thread may call; other generic families reach Core Text
+  as literal names. The rasterizer puts the layer's `text-font` names before
+  these. The other native platforms have no local rasterizer.
 - **`StyleController.setPlacementTransitions` mirrors the C API's
   `StyleTransitionOptions.enablePlacementTransitions`.** Native keeps the
   style's transition duration and delay. gl-js only takes `fadeDuration` as
@@ -710,6 +727,16 @@ Each entry: the decision, then why.
   wheel delta by the device pixel ratio except on macOS, so the recognizer
   multiplies it back); a trackpad pinch that arrives as a scale signal
   zooms by its scale.
+- **A pinch rotates only after its fingers twist
+  `MapGestures.rotateThreshold` degrees (default 15) since it started.** The
+  twist below it is dropped, so the map doesn't jump; zoom and pan are never
+  held back. GL JS waits for 25 px along the circle of the fingers (about 14°
+  at 200 px apart); MapLibre Android waits 3° to 15° depending on speed and
+  turns rotation off once a zoom starts first; iOS waits 3° while zooming;
+  flutter_map waits 20° only with `enableMultiFingerGestureRace`, where the
+  first gesture past its threshold locks the others out. A fixed angle is
+  easier to explain and set than GL JS's distance, and locking rotation out
+  after a zoom would make zooming and turning at once impossible.
 - **A long click is a hold of one finger.** Flutter's long press recognizer
   times the first pointer alone and wins the arena when its deadline passes,
   whatever else landed, so two fingers resting on the map before a pinch were
@@ -794,6 +821,16 @@ Each entry: the decision, then why.
   the move. Hit testing of annotation layers therefore ranks hits by the
   index in `style.layers`, and the integration test checks the order by
   color.
+- `maplibre_native_ffi` has no local font option, although MapLibre Native's
+  renderer takes a local font family. On iOS and macOS the local glyph
+  rasterizer also reads the `MLNIdeographicFontFamilyName` user default,
+  which `localIdeographFontFamily` sets before each session attaches. The
+  renderer reads it at the session's first frame, and it is the process's,
+  so a map that attaches with different fonts before another map's first
+  frame gives that map its fonts. It is registered in the registration
+  domain, so a value the app stores under that key, or passes as a launch
+  argument, overrides the option. Android, Windows and Linux draw the
+  style's glyphs.
 - MapLibre Native moves to the style's camera on load only while no camera
   change happened, and `mln_map_set_bounds` counts as one (it always passes
   bounds, even `unbounded`). The C API has no getter for the style's camera.

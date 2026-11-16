@@ -7,9 +7,9 @@ icon: lucide/locate
 
 ## Map options
 
-`MapOptions` configures a `MapLibreMap`. Every option except `initCamera` and
-`fastPforEnabled` can change at any time, for example with `setState()`, and
-the map follows:
+`MapOptions` configures a `MapLibreMap`. Every option except `initCamera`,
+`fastPforEnabled` and `localIdeographFontFamily` can change at any time, for
+example with `setState()`, and the map follows:
 
 ```dart
 MapLibreMap(
@@ -38,6 +38,7 @@ MapLibreMap(
 | `movements`             | What the user may change, see [Gestures](#gestures).                            |
 | `gestures`              | Which gestures move the map, see [Gestures](#gestures).                         |
 | `fastPforEnabled`       | Decode MLT tiles that use FastPFOR, see [Sources](sources/tiles.md#maplibre-tiles-mlt). Only read once. Always on for web. |
+| `localIdeographFontFamily` | Draw CJK ideographs, kana and Hangul with the device's fonts, a CSS font-family list, instead of downloading the style's glyphs. Defaults to `'sans-serif'`; `null` draws the style's glyphs. Only read once. Only on iOS, macOS and web. |
 
 ## Initial camera
 
@@ -132,6 +133,11 @@ options decide what they do, and everything is on by default:
 | `doubleTapDrag` | Double tap and drag up or down                                | zoom              |
 | `secondaryDrag` | Drag with the right mouse button or Ctrl + left button        | rotate, pitch     |
 | `twoFingerDrag` | Drag two fingers side by side up or down                      | pitch             |
+
+A pinch rotates the map only once its fingers twist more than
+`MapGestures.rotateThreshold`, 15 degrees by default, so that zooming and
+panning with two fingers doesn't turn the map by accident. Set it to 0 to
+rotate right away.
 
 ```dart
 MapOptions(
