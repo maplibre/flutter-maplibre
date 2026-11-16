@@ -288,9 +288,19 @@ Each entry: the decision, then why.
   objects were rejected as imperative; slots by kind (`controls:`,
   `plugins:`) because one plugin can have layers, events and UI.
 - **`MapLibreInheritedModel` has aspects.** `MapController.of` and
-  `MapOptions.of` rebuild on a new controller, options or style;
-  `CameraPosition.of` on every camera change. Widgets that show something
-  that moves with the camera must read `CameraPosition.of`.
+  `MapOptions.of` rebuild on a new controller, options or style, or when
+  rendering pauses or resumes; `CameraPosition.of` on every camera change;
+  `StyleController.of` on a new style and on every notification of the
+  style. Widgets that show something that moves with the camera must read
+  `CameraPosition.of`.
+- **The style notifies structure, not values.** `StyleLayers` notify on
+  add, remove and move, `StyleSources` on add, remove and changed TileJSON,
+  the `StyleController` on those and on attribution changes (platforms call
+  `notifyAttributionsChanged`). Layer properties and source data don't
+  notify, as apps change them every frame and every `StyleController.of`
+  widget would rebuild with them. The map counts the notifications into the
+  model, after the frame when they come while the tree builds (annotation
+  layers change there).
 - **`MapOptions.style` is a sealed `MapStyle` and declarative; there is no
   `setStyle`.** Backends switch on the type instead of guessing from the
   string, and a changed `style` loads the new style.

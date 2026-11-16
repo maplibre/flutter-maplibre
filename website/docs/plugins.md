@@ -27,19 +27,23 @@ along with everything it added to the map.
 
 Every widget below the map can call these:
 
-| Call                                                | Returns                                         | The widget rebuilds when             |
-| --------------------------------------------------- | ----------------------------------------------- | ------------------------------------ |
-| `MapController.of(context)` / `maybeOf`             | The controller: camera moves, queries, the style | The controller, options, style or attributions change |
-| `CameraPosition.of(context)` / `maybeOf`            | The current camera                              | The camera moves                     |
-| `MapOptions.of(context)` / `maybeOf`                | The `MapLibreMap.options`                       | The options change                   |
+| Call                                     | Returns                                          | The widget rebuilds when                               |
+| ---------------------------------------- | ------------------------------------------------ | ------------------------------------------------------ |
+| `MapController.of(context)` / `maybeOf`  | The controller: camera moves, queries, the style | The controller, options or style change, or the map pauses or resumes rendering |
+| `CameraPosition.of(context)` / `maybeOf` | The current camera                               | The camera moves                                       |
+| `MapOptions.of(context)` / `maybeOf`     | The `MapLibreMap.options`                        | The options change                                     |
+| `StyleController.of(context)` / `maybeOf` | The loaded style: layers, sources, attributions | A style loads, layers or sources come, go or move, or the attributions change |
 
 Only `CameraPosition.of` rebuilds the widget while the camera moves. Use it
 when a widget shows something that depends on the camera, such as a
 position on the screen. Use `MapController.of` alone for a widget that only
 calls the controller, such as a button.
 
-Changes inside the style, such as added layers or sources, don't rebuild
-widgets. A widget that shows them listens to the style itself.
+`StyleController.of` suits a widget that lists what the style has, such as
+a layer switcher or a legend. It doesn't rebuild when the properties of a
+layer or the data of a source change, as apps change those every frame. Code
+outside of `build` can listen to the `StyleController`, its `layers` or its
+`sources` instead.
 
 ### Draw over the map
 

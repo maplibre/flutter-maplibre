@@ -67,7 +67,7 @@ class _SourceAttributionState extends State<SourceAttribution> {
 
   @override
   Widget build(BuildContext context) {
-    final style = MapController.maybeOf(context)?.style;
+    final style = StyleController.maybeOf(context);
     final camera = CameraPosition.maybeOf(context);
     if (style == null || camera == null) return const SizedBox.shrink();
 

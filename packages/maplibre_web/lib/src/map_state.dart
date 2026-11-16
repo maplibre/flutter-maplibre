@@ -49,7 +49,6 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
   bool _nextGestureCausedByController = false;
 
   /// The attributions that the widgets in [MapLibreMap.children] last saw.
-  List<String> _attributions = const [];
 
   /// A gesture or its fling moves the camera; [_gestureMoveStarted] once it
   /// has reported the start of the move.
@@ -171,7 +170,7 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
           if (event.dataType == 'style' ||
               event.sourceDataType == 'metadata' ||
               event.sourceDataType == 'visibility') {
-            _onAttributionsMaybeChanged();
+            style?.checkAttributions();
           }
           if (event.sourceDataType == 'metadata') style?.refreshTileJson();
         }.toJS,
@@ -814,19 +813,8 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
     style = styleCtrl;
     effectiveWidget.onStyleLoaded?.call(styleCtrl);
     attachAnnotations(styleCtrl);
-    _attributions = styleCtrl.attributions;
     // setState is needed to refresh the flutter widgets used in MapLibreMap.children.
     setState(() {});
-  }
-
-  /// Rebuilds the widgets in [MapLibreMap.children], such as
-  /// `SourceAttribution`, when the attributions of the style changed.
-  void _onAttributionsMaybeChanged() {
-    final style = this.style;
-    if (style == null || !mounted) return;
-    final attributions = style.attributions;
-    if (listEquals(attributions, _attributions)) return;
-    setState(() => _attributions = attributions);
   }
 }
 

@@ -964,6 +964,19 @@ abstract class MapLibreMapState extends State<MapLibreMap>
   /// The style layers whose callbacks [build] follows.
   StyleLayers? _styleLayers;
 
+  /// The style that [_onStyleChanged] listens to.
+  StyleController? _listenedStyle;
+
+  /// Counts the notifications of [style] for [StyleController.of].
+  var _styleRevision = 0;
+
+  void _listenToStyle() {
+    final style = this.style;
+    if (identical(style, _listenedStyle)) return;
+    _listenedStyle?.removeListener(_onStyleChanged);
+    _listenedStyle = style?..addListener(_onStyleChanged);
+  }
+
   void _listenToStyleLayers() {
     final layers = style?.layers;
     if (identical(layers, _styleLayers)) return;
@@ -987,8 +1000,17 @@ abstract class MapLibreMapState extends State<MapLibreMap>
     }
   }
 
+  /// Rebuilds the widgets that depend on [StyleController.of], after the
+  /// frame if the style changed while the tree builds.
+  void _onStyleChanged() {
+    if (!mounted) return;
+    _styleRevision++;
+    _onStyleCallbacksChanged();
+  }
+
   @override
   void dispose() {
+    _listenedStyle?.removeListener(_onStyleChanged);
     _styleLayers?.callbacksChanged.removeListener(_onStyleCallbacksChanged);
     _plugins.dispose();
     super.dispose();
@@ -1002,6 +1024,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
     final layersDraggable = _layersDraggable;
     // Only the gesture detector reports taps and the mouse to style layers.
     if (gestureCamera != null) _listenToStyleLayers();
+    _listenToStyle();
     final clicks =
         gestureCamera != null &&
         (_layersClickable ||
@@ -1054,7 +1077,8 @@ abstract class MapLibreMapState extends State<MapLibreMap>
               cameraPosition: camera,
               options: options,
               style: style,
-              attributions: style?.attributions,
+              styleRevision: _styleRevision,
+              renderingPaused: _renderingPaused,
               plugins: _plugins,
               child: isInitialized
                   ? Stack(key: _childrenKey, children: widget.children)

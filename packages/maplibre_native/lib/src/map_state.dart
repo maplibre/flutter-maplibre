@@ -493,15 +493,7 @@ class MapLibreMapStateNative extends MapLibreMapState {
     detachAnnotations();
     style?.dispose();
     style = null;
-    late final StyleControllerNative styleController;
-    styleController = StyleControllerNative(
-      map,
-      // Rebuilds the widgets in MapLibreMap.children, such as
-      // SourceAttribution.
-      onAttributionsChanged: () {
-        if (mounted && style == styleController) setState(() {});
-      },
-    );
+    final styleController = StyleControllerNative(map);
     _loadingStyle = styleController;
     // The style is only handed out once its layers and sources are known.
     await styleController.load();

@@ -20,6 +20,9 @@
 
 - `MapPlugin` lets a widget in `MapLibreMap.children` add layers, event
   callbacks and limits on movements and gestures to the map.
+- `StyleController.of(context)` rebuilds a widget when a style loads, or
+  its layers, sources or attributions change; `StyleController`,
+  `StyleLayers` and `StyleSources` are `Listenable`.
 - `MapAlign` stacks the widgets of `MapLibreMap.children` at one place of
   the map, so that they don't overlap.
 - Annotation layers take an optional `id`, which names their style layer and

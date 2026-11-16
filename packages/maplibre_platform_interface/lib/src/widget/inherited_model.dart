@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:maplibre_platform_interface/maplibre_platform_interface.dart';
 import 'package:maplibre_platform_interface/src/widget/map_plugin_registry.dart';
@@ -6,12 +5,15 @@ import 'package:maplibre_platform_interface/src/widget/map_plugin_registry.dart'
 /// What a widget below a [MapLibreMap] depends on, so that it only rebuilds
 /// when that changes.
 enum MapLibreAspect {
-  /// The [MapController], its [MapOptions], its [StyleController] and the
-  /// attributions of the style.
+  /// The [MapController], its [MapOptions], which [StyleController] it has
+  /// and whether its rendering is paused.
   controller,
 
   /// The [CameraPosition], which changes with every frame of a camera move.
   camera,
+
+  /// The [StyleController] and its layers, sources and attributions.
+  style,
 }
 
 /// The [InheritedModel] makes it possible to call `MapController.of(context)`.
@@ -25,7 +27,8 @@ class MapLibreInheritedModel extends InheritedModel<MapLibreAspect> {
     required this.cameraPosition,
     this.options,
     this.style,
-    this.attributions,
+    this.styleRevision = 0,
+    this.renderingPaused = false,
     this.plugins,
     super.key,
   });
@@ -44,9 +47,12 @@ class MapLibreInheritedModel extends InheritedModel<MapLibreAspect> {
   /// widgets that depend on the controller rebuild when it changes.
   final StyleController? style;
 
-  /// The [StyleController.attributions] when this model was built, so that
-  /// the widgets that depend on the controller rebuild when they change.
-  final List<String>? attributions;
+  /// Counts the notifications of [style], so that the widgets that depend on
+  /// the style rebuild when its layers, sources or attributions change.
+  final int styleRevision;
+
+  /// [MapController.isRenderingPaused] when this model was built.
+  final bool renderingPaused;
 
   /// The [MapPlugin]s below the map register here.
   final MapPluginRegistry? plugins;
@@ -60,8 +66,8 @@ class MapLibreInheritedModel extends InheritedModel<MapLibreAspect> {
   );
 
   /// Get the in the widget tree injected [MapController]. The widget of
-  /// [context] rebuilds when the controller, its options, its style or the
-  /// attributions of the style change, but not when the camera moves.
+  /// [context] rebuilds when the controller, its options, its style or
+  /// whether it is paused change, but not when the camera moves.
   /// Used in [MapController.maybeOf] and [MapOptions.maybeOf].
   static MapController? maybeMapControllerOf(BuildContext context) =>
       _of(context, MapLibreAspect.controller)?.mapController;
@@ -72,6 +78,12 @@ class MapLibreInheritedModel extends InheritedModel<MapLibreAspect> {
   static CameraPosition? maybeCameraPositionOf(BuildContext context) =>
       _of(context, MapLibreAspect.camera)?.cameraPosition;
 
+  /// The loaded [StyleController] of the closest map. The widget of
+  /// [context] rebuilds when it or its layers, sources or attributions
+  /// change. Used in [StyleController.maybeOf].
+  static StyleController? maybeStyleOf(BuildContext context) =>
+      _of(context, MapLibreAspect.style)?.style;
+
   /// The registry of the closest map, without depending on it.
   static MapPluginRegistry? maybePluginsOf(BuildContext context) =>
       context.getInheritedWidgetOfExactType<MapLibreInheritedModel>()?.plugins;
@@ -80,14 +92,20 @@ class MapLibreInheritedModel extends InheritedModel<MapLibreAspect> {
       !identical(mapController, oldWidget.mapController) ||
       options != oldWidget.options ||
       !identical(style, oldWidget.style) ||
-      !listEquals(attributions, oldWidget.attributions);
+      renderingPaused != oldWidget.renderingPaused;
+
+  bool _styleChanged(MapLibreInheritedModel oldWidget) =>
+      !identical(style, oldWidget.style) ||
+      styleRevision != oldWidget.styleRevision;
 
   bool _cameraChanged(MapLibreInheritedModel oldWidget) =>
       cameraPosition != oldWidget.cameraPosition;
 
   @override
   bool updateShouldNotify(covariant MapLibreInheritedModel oldWidget) =>
-      _controllerChanged(oldWidget) || _cameraChanged(oldWidget);
+      _controllerChanged(oldWidget) ||
+      _cameraChanged(oldWidget) ||
+      _styleChanged(oldWidget);
 
   @override
   bool updateShouldNotifyDependent(
@@ -97,5 +115,6 @@ class MapLibreInheritedModel extends InheritedModel<MapLibreAspect> {
       (dependencies.contains(MapLibreAspect.controller) &&
           _controllerChanged(oldWidget)) ||
       (dependencies.contains(MapLibreAspect.camera) &&
-          _cameraChanged(oldWidget));
+          _cameraChanged(oldWidget)) ||
+      (dependencies.contains(MapLibreAspect.style) && _styleChanged(oldWidget));
 }

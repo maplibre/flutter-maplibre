@@ -515,27 +515,40 @@ void main() {
       expect(cameraBuilds, hasLength(2));
     });
 
-    testWidgets('widgets that read the controller rebuild when the '
-        'attributions change', (tester) async {
-      final builds = <int>[];
+    testWidgets('widgets rebuild for the aspect they read', (tester) async {
+      final controllerBuilds = <int>[];
+      final styleBuilds = <int>[];
       final controller = _State(_Camera());
-      // The same child, which only rebuilds when the model notifies it.
-      final child = _BuildCounter(MapController.of, builds);
-      Widget model(List<String> attributions) => Directionality(
-        textDirection: TextDirection.ltr,
-        child: MapLibreInheritedModel(
-          mapController: controller,
-          cameraPosition: null,
-          attributions: attributions,
-          child: child,
-        ),
+      // The same children, which only rebuild when the model notifies them.
+      final children = Column(
+        children: [
+          _BuildCounter(MapController.of, controllerBuilds),
+          _BuildCounter(StyleController.maybeOf, styleBuilds),
+        ],
       );
-      await tester.pumpWidget(model(['a']));
-      builds.clear();
-      await tester.pumpWidget(model(['a']));
-      expect(builds, isEmpty);
-      await tester.pumpWidget(model(['a', 'b']));
-      expect(builds, hasLength(1));
+      Widget model({int styleRevision = 0, bool renderingPaused = false}) =>
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: MapLibreInheritedModel(
+              mapController: controller,
+              cameraPosition: null,
+              styleRevision: styleRevision,
+              renderingPaused: renderingPaused,
+              child: children,
+            ),
+          );
+      await tester.pumpWidget(model());
+      controllerBuilds.clear();
+      styleBuilds.clear();
+      await tester.pumpWidget(model());
+      expect(controllerBuilds, isEmpty);
+      expect(styleBuilds, isEmpty);
+      await tester.pumpWidget(model(styleRevision: 1));
+      expect(controllerBuilds, isEmpty);
+      expect(styleBuilds, hasLength(1));
+      await tester.pumpWidget(model(styleRevision: 1, renderingPaused: true));
+      expect(controllerBuilds, hasLength(1));
+      expect(styleBuilds, hasLength(1));
     });
 
     testWidgets('a plugin that rebuilds unchanged leaves the map alone', (
