@@ -57,7 +57,7 @@ void main() {
       WidgetTester tester, {
       UserLocationTracking tracking = UserLocationTracking.none,
       double? trackingZoom,
-      UserLocationMarker marker = const UserLocationMarker.painted(),
+      UserLocationStyle style = const UserLocationStyle(),
     }) => tester.pumpWidget(
       App(
         camera: _camera,
@@ -68,7 +68,7 @@ void main() {
             tracking: tracking,
             trackingZoom: trackingZoom,
             onTrackingChanged: trackingChanges.add,
-            marker: marker,
+            style: style,
           ),
         ],
       ),
@@ -78,104 +78,6 @@ void main() {
       locations.add(location);
       await tester.pump();
     }
-
-    RenderObject layer(WidgetTester tester) => tester.renderObject(
-      find.descendant(
-        of: find.byType(UserLocationLayer),
-        matching: find.byType(CustomPaint),
-      ),
-    );
-
-    Finder painter() => find.descendant(
-      of: find.byType(UserLocationLayer),
-      matching: find.byType(CustomPaint),
-    );
-
-    testWidgets('paints nothing before the first location', (tester) async {
-      await pump(tester);
-      expect(layer(tester), paintsNothing);
-    });
-
-    testWidgets('paints nothing with style layers', (tester) async {
-      await pump(tester, marker: const UserLocationMarker.style());
-      await add(
-        tester,
-        const UserLocation(position: Geographic(lon: 0.1, lat: 0.05)),
-      );
-      expect(painter(), findsNothing);
-    });
-
-    testWidgets('shows the widget of the marker at the location', (
-      tester,
-    ) async {
-      await pump(
-        tester,
-        marker: UserLocationMarker.widget(
-          (context, location) =>
-              const SizedBox(key: Key('puck'), width: 20, height: 10),
-        ),
-      );
-      await add(
-        tester,
-        const UserLocation(position: Geographic(lon: 0.1, lat: 0.05)),
-      );
-      expect(
-        tester.getCenter(find.byKey(const Key('puck'))),
-        const Offset(500, 250),
-      );
-    });
-
-    testWidgets('paints the dot at the screen location', (tester) async {
-      await pump(tester);
-      await add(
-        tester,
-        const UserLocation(position: Geographic(lon: 0.1, lat: 0.05)),
-      );
-      expect(
-        layer(tester),
-        paints
-          ..circle(x: 500, y: 250, radius: 10, color: Colors.white)
-          ..circle(x: 500, y: 250, radius: 8),
-      );
-    });
-
-    testWidgets('paints the accuracy in meters', (tester) async {
-      await pump(tester);
-      // 111.32 m north is 0.001 degrees, 1 px here: 2226.4 m is 20 px.
-      await add(
-        tester,
-        const UserLocation(
-          position: Geographic(lon: 0, lat: 0),
-          accuracy: 2226.4,
-        ),
-      );
-      expect(
-        layer(tester),
-        paints..something(
-          (method, arguments) =>
-              method == #drawCircle &&
-              arguments[0] == const Offset(400, 300) &&
-              ((arguments[1] as double) - 20).abs() < 1e-6,
-        ),
-      );
-    });
-
-    testWidgets('paints the heading against the bearing', (tester) async {
-      await pump(tester);
-      await add(
-        tester,
-        const UserLocation(position: Geographic(lon: 0, lat: 0), heading: 120),
-      );
-      // The cone points 90 degrees clockwise from up on screen, to the
-      // right, so it covers a point there but none to the left.
-      expect(
-        layer(tester),
-        paints..path(
-          includes: [const Offset(420, 300)],
-          excludes: [const Offset(380, 300)],
-        ),
-      );
-    });
 
     testWidgets('does not move the camera without tracking', (tester) async {
       await pump(tester);
@@ -284,23 +186,22 @@ void main() {
       );
     });
 
-    testWidgets('hands the plugin style layers only for the style marker', (
-      tester,
-    ) async {
-      await pump(tester, marker: const UserLocationMarker.style());
+    testWidgets('hands the plugin the layers of the location', (tester) async {
+      await pump(tester);
       expect(plugin(tester).layers, isEmpty);
       await add(
         tester,
         const UserLocation(position: Geographic(lon: 1, lat: 2), accuracy: 10),
       );
       final layers = plugin(tester).layers;
+      // The accuracy circle and the dot.
       expect(layers, hasLength(2));
       // A rebuild keeps the layers while the location stays.
       await tester.pump();
       expect(plugin(tester).layers, same(layers));
 
-      await pump(tester);
-      expect(plugin(tester).layers, isEmpty);
+      await pump(tester, style: const UserLocationStyle(showAccuracy: false));
+      expect(plugin(tester).layers, hasLength(1));
     });
 
     testWidgets('lets pointers through to the map', (tester) async {

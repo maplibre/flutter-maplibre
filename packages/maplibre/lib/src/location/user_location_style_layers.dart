@@ -26,7 +26,7 @@ const _headingRadius = 8.0;
 /// The pixel ratio that the heading image is drawn at.
 const _headingPixelRatio = 3.0;
 
-/// The layers of a [UserLocationMarkerStyle] at [location]: the accuracy
+/// The layers that show [location] in [style]: the accuracy
 /// circle, the heading cone and the dot or icon, from the bottom. Each is a
 /// type of its own, so that the map keeps their style layers when another
 /// location comes.
@@ -35,47 +35,47 @@ const _headingPixelRatio = 3.0;
 /// null while it is drawn, which leaves the heading out.
 List<Layer> userLocationStyleLayers({
   required UserLocation location,
-  required UserLocationMarkerStyle marker,
-  required Color color,
-  required double radius,
+  required UserLocationStyle style,
+  LayerAnchor anchor = const LayerAnchor.top(),
+  ValueChanged<UserLocation>? onClick,
   Uint8List? headingImage,
 }) {
+  final UserLocationStyle(:color, :radius) = style;
   final points = [Feature(geometry: Point(location.position))];
   final accuracy = location.accuracy;
   final heading = location.heading;
-  final onClick = marker.onClick;
   void reportClick(LayerFeatureEvent _) => onClick?.call(location);
   final click = onClick == null ? null : reportClick;
   return [
-    if (marker.showAccuracy && accuracy != null && accuracy > 0)
+    if (style.showAccuracy && accuracy != null && accuracy > 0)
       _AccuracyLayer(
-        anchor: marker.anchor,
+        anchor: anchor,
         points: points,
         radius: accuracyRadius(accuracy, location.position.lat),
         color: color,
       ),
-    if (marker.showHeading && heading != null && headingImage != null)
+    if (style.showHeading && heading != null && headingImage != null)
       _HeadingLayer(
-        anchor: marker.anchor,
+        anchor: anchor,
         points: points,
         icon: MarkerIcon.bytes(headingImage, pixelRatio: _headingPixelRatio),
         size: radius / _headingRadius,
         rotate: heading,
         flat: true,
       ),
-    if (marker.icon case final icon?)
+    if (style.icon case final icon?)
       _IconLayer(
-        anchor: marker.anchor,
+        anchor: anchor,
         points: points,
         icon: icon,
         size: 1,
-        rotate: marker.rotateIcon ? heading ?? 0 : 0,
+        rotate: style.rotateIcon ? heading ?? 0 : 0,
         flat: false,
         onClick: click,
       )
     else
       _DotLayer(
-        anchor: marker.anchor,
+        anchor: anchor,
         points: points,
         radius: radius,
         color: color,

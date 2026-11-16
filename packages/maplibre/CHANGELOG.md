@@ -15,6 +15,9 @@
 - The style layers of `MapLibreMap.layers` can no longer be removed or moved
   through `StyleController.layers`
   ([#674](https://github.com/maplibre/flutter-maplibre/issues/674)).
+- `UserLocationLayer.style` takes a `UserLocationStyle`, which replaces
+  `UserLocationLayer.color` and `radius` and can hide the accuracy and the
+  heading or replace the dot with an icon.
 
 ### Features
 
@@ -45,9 +48,9 @@
   ([#611](https://github.com/maplibre/flutter-maplibre/issues/611)).
 - A pinch rotates the map only after its fingers twist 15 degrees, set with
   `MapGestures.rotateThreshold`.
-- `UserLocationLayer` draws the location with style layers of the map by
-  default, which never trail the camera and lie flat on a tilted map;
-  `UserLocationLayer.marker` also paints it as before or shows a widget.
+- `UserLocationLayer` draws the location with style layers of the map, which
+  never trail the camera and lie flat on a tilted map. `anchor` places them
+  among the layers of the style, and `onClick` reports taps on the location.
 
 ### Bug Fixes
 

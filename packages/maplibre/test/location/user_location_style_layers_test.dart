@@ -10,14 +10,12 @@ const _color = Color(0xFF1A73E8);
 
 List<StyleLayer> _styleLayers(
   UserLocation location, {
-  UserLocationMarkerStyle marker = const UserLocationMarkerStyle(),
+  UserLocationStyle style = const UserLocationStyle(),
   Uint8List? headingImage,
 }) => [
   for (final layer in userLocationStyleLayers(
     location: location,
-    marker: marker,
-    color: _color,
-    radius: 8,
+    style: style,
     headingImage: headingImage,
   ))
     layer.createStyleLayer(id: 'layer', sourceId: 'source'),
@@ -65,13 +63,10 @@ void main() {
     expect(layers.single, isA<CircleStyleLayer>());
   });
 
-  test('leaves out what the marker hides', () {
+  test('leaves out what the style hides', () {
     final layers = _styleLayers(
       const UserLocation(position: position, accuracy: 20, heading: 90),
-      marker: const UserLocationMarkerStyle(
-        showAccuracy: false,
-        showHeading: false,
-      ),
+      style: const UserLocationStyle(showAccuracy: false, showHeading: false),
       headingImage: Uint8List(1),
     );
     expect(layers.single, isA<CircleStyleLayer>());
@@ -81,13 +76,11 @@ void main() {
     const icon = MarkerIcon.named('arrow');
     List<Layer> layers({required bool rotateIcon}) => userLocationStyleLayers(
       location: const UserLocation(position: position, heading: 45),
-      marker: UserLocationMarkerStyle(
+      style: UserLocationStyle(
         icon: icon,
         rotateIcon: rotateIcon,
         showHeading: false,
       ),
-      color: _color,
-      radius: 8,
     );
     final layer = layers(rotateIcon: true).single;
     expect(layer.icon, icon);
@@ -107,9 +100,8 @@ void main() {
     const location = UserLocation(position: position);
     final dot = userLocationStyleLayers(
       location: location,
-      marker: UserLocationMarkerStyle(onClick: clicks.add),
-      color: _color,
-      radius: 8,
+      style: const UserLocationStyle(),
+      onClick: clicks.add,
     ).single;
     dot.onClick!(
       const LayerFeatureEvent(
@@ -132,5 +124,20 @@ void main() {
     expect(stops[1] as num, closeTo(10, 1e-6));
     expect(stops[2], 24);
     expect(stops[3] as num, closeTo(10 * pow(2, 24), 1e-3));
+  });
+
+  test('UserLocationStyle copies and compares by value', () {
+    const style = UserLocationStyle();
+    final copy = style.copyWith(radius: 12, showHeading: false);
+    expect(copy.radius, 12);
+    expect(copy.showHeading, isFalse);
+    expect(copy.color, style.color);
+    expect(copy, const UserLocationStyle(radius: 12, showHeading: false));
+    expect(
+      copy.hashCode,
+      const UserLocationStyle(radius: 12, showHeading: false).hashCode,
+    );
+    expect(copy, isNot(style));
+    expect(style.toString(), contains('UserLocationStyle'));
   });
 }

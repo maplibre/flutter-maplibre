@@ -113,33 +113,35 @@ Widget build(BuildContext context) {
 `trackingZoom` is the zoom the camera moves to when tracking starts, and
 `trackingDuration` how long it takes to follow a new location.
 
-## Marker
+## Style
 
-`color` and `radius` change the look of the dot. `marker` chooses how the
-location is drawn:
-
-- `UserLocationMarker.style()`, the default, draws it with style layers of the
-  map. The map draws them in the same frame as everything else, so they never
-  trail the camera, and the accuracy circle and the heading lie flat on a
-  tilted map. `anchor` places them among the layers of the style, `icon`
-  replaces the dot, for example with an arrow that turns with the heading, and
-  `onClick` reports taps on the location. `showAccuracy` and `showHeading` hide
-  the accuracy circle and the heading.
-- `UserLocationMarker.painted()` paints it with Flutter over the map. On web it
-  can trail camera animations, such as those of the tracking.
-- `UserLocationMarker.widget(builder)` shows any widget centered on the
-  location, with the same limits as `painted()`.
+`style` changes how the location looks, with a `UserLocationStyle`:
 
 ```dart
 UserLocationLayer(
   locations: locations,
-  marker: UserLocationMarker.style(
-    // Below the labels of the style.
-    anchor: const LayerAnchor.below('place_label'),
-    onClick: (location) => print('Tapped my location'),
+  style: const UserLocationStyle(
+    color: Color(0xFF2E7D32),
+    radius: 10,
+    showAccuracy: false,
   ),
+  // Below the labels of the style.
+  anchor: const LayerAnchor.below('place_label'),
+  onClick: (location) => print('Tapped my location'),
 )
 ```
+
+- `color` and `radius` set the dot, and the accuracy circle and the heading
+  take the color too.
+- `showAccuracy` and `showHeading` hide the accuracy circle and the heading
+  cone.
+- `icon` replaces the dot, for example with an arrow, which turns with the
+  heading while `rotateIcon` is set.
+
+The location is drawn with style layers of the map, so the map draws it in
+the same frame as everything else and it never trails the camera. The
+accuracy circle and the heading lie flat on a tilted map. `anchor` places the
+layers among those of the style, and `onClick` reports taps on the location.
 
 Check out the
 [example app](https://github.com/maplibre/flutter-maplibre/blob/main/examples/lib/user_location_page.dart)
