@@ -87,7 +87,13 @@ void main() {
   }) => tester.pumpWidget(
     Directionality(
       textDirection: TextDirection.ltr,
-      child: MapLibreMap(options: options, camera: camera, children: children),
+      child: camera == null
+          ? MapLibreMap(options: options, children: children)
+          : MapLibreMap.withCamera(
+              camera: camera,
+              options: options,
+              children: children,
+            ),
     ),
   );
 

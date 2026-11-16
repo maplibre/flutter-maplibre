@@ -20,7 +20,7 @@
 
 ### Features
 
-- `MapLibreMap.camera` lets the app drive the camera: the map applies each
+- `MapLibreMap.withCamera` lets the app drive the camera: the map applies each
   new camera while the widget builds, in the same browser frame as the
   widgets on web.
 - `MapPlugin` lets a widget in `MapLibreMap.children` add layers, event

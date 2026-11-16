@@ -783,7 +783,6 @@ abstract class MapLibreMapState extends State<MapLibreMap>
     final onDragEnd = app.onDragEnd;
     return MapLibreMap(
       options: app.options,
-      camera: app.camera,
       gestureRecognizers: app.gestureRecognizers,
       onMapCreated: app.onMapCreated,
       onStyleLoaded: _toAll(app.onStyleLoaded, (p) => p.onStyleLoaded),
