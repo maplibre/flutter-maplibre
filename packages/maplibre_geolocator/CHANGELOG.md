@@ -1,6 +1,6 @@
-## 0.1.0-pre.2
+## 0.1.0
 
-- Works with `maplibre` 0.4.0-pre.3, where the `UserLocationLayer` draws the
+- Works with `maplibre` 0.4.0, where the `UserLocationLayer` draws the
   location with style layers.
 - The links on pub.dev point to the new documentation on
   [maplibre.org/flutter-maplibre](https://maplibre.org/flutter-maplibre).
