@@ -23,10 +23,18 @@ import 'package:web/web.dart' hide PointerEvent;
 
 part 'style_controller.dart';
 
+/// Matches a CSS font-family list without names: only commas, quotes and
+/// whitespace.
+final _noFontNames = RegExp(r'''^[\s,'"]*$''');
+
 /// The web specific implementation of the [MapLibreMap] widget.
 final class MapLibreMapStateWeb extends MapLibreMapState {
   late HTMLDivElement _htmlElement;
   late interop.JsMap _map;
+
+  /// The milliseconds that label placement changes fade over while their
+  /// transitions are on: the map's own value, read once [_map] exists.
+  late num _placementFadeDuration;
 
   /// maplibre-gl-js is loaded, so the platform view can create [_map].
   var _jsLoaded = false;
@@ -41,7 +49,6 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
   bool _nextGestureCausedByController = false;
 
   /// The attributions that the widgets in [MapLibreMap.children] last saw.
-  List<String> _attributions = const [];
 
   /// A gesture or its fling moves the camera; [_gestureMoveStarted] once it
   /// has reported the start of the move.
@@ -93,16 +100,24 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
         // widgets over the map keep theirs.
         ..style.pointerEvents = 'none';
 
-      _map = interop.JsMap(
-        interop.MapOptions(
-          container: _htmlElement,
-          style: _jsStyle(options.style),
-          attributionControl: false,
-          // MapGestureDetector handles the input.
-          interactive: false,
-          transformRequest: _transformRequest.toJS,
-        ),
+      final mapOptions = interop.MapOptions(
+        container: _htmlElement,
+        style: _jsStyle(options.style),
+        attributionControl: false,
+        // MapGestureDetector handles the input.
+        interactive: false,
+        transformRequest: _transformRequest.toJS,
       );
+      // gl-js draws the style's glyphs for `false`. A list without names,
+      // such as `''`, would otherwise turn local drawing on with no font.
+      final fontFamily = options.localIdeographFontFamily?.trim();
+      mapOptions.localIdeographFontFamily =
+          fontFamily == null || _noFontNames.hasMatch(fontFamily)
+          ? false.toJS
+          : fontFamily.toJS;
+      _map = interop.JsMap(mapOptions);
+      // gl-js's default if its private field is gone.
+      _placementFadeDuration = _map.fadeDuration ?? 300;
       _mapCreated = true;
 
       document.body?.appendChild(_htmlElement);
@@ -111,11 +126,11 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         // The map has the size of its platform view only now, so bounds are
         // fitted again for it.
-        if (options.initCamera case final CameraUpdateFit initCamera) {
+        if (initialCamera case final CameraUpdateFit initCamera) {
           _resizeMap();
           _applyInitialCamera(initCamera);
         }
-        widget.onMapCreated?.call(this);
+        effectiveWidget.onMapCreated?.call(this);
         _onLoadingStarted();
         setState(() => isInitialized = true);
       });
@@ -129,7 +144,7 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
       _map.setMaxBounds(options.maxBounds?.toJs());
       // Without an initial camera, the map takes the style's camera once it
       // loads.
-      if (options.initCamera case final initCamera?) {
+      if (initialCamera case final initCamera?) {
         _applyInitialCamera(initCamera);
       }
 
@@ -146,7 +161,7 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
           if (event.dataType == 'source' &&
               event.sourceDataType == 'metadata') {
             if (event.sourceId case final sourceId?) {
-              widget.onSourceChanged?.call(
+              effectiveWidget.onSourceChanged?.call(
                 MapEventSourceChanged(sourceId: sourceId),
               );
             }
@@ -155,7 +170,7 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
           if (event.dataType == 'style' ||
               event.sourceDataType == 'metadata' ||
               event.sourceDataType == 'visibility') {
-            _onAttributionsMaybeChanged();
+            style?.checkAttributions();
           }
           if (event.sourceDataType == 'metadata') style?.refreshTileJson();
         }.toJS,
@@ -163,10 +178,12 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
       _map.on(
         interop.MapEventType.idle,
         (interop.MapMouseEvent event) {
-          widget.onIdle?.call(const MapEventIdle());
+          effectiveWidget.onIdle?.call(const MapEventIdle());
           if (_loading) {
             _loading = false;
-            widget.onLoadingFinished?.call(const MapEventLoadingFinished());
+            effectiveWidget.onLoadingFinished?.call(
+              const MapEventLoadingFinished(),
+            );
           }
         }.toJS,
       );
@@ -179,7 +196,7 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
             null => 'Unknown error',
           };
           final sourceId = event.sourceId;
-          final onError = widget.onError;
+          final onError = effectiveWidget.onError;
           if (onError == null) {
             debugPrint('maplibre_web: $message');
             return;
@@ -196,7 +213,7 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
       _map.on(
         interop.MapEventType.styleImageMissing,
         (interop.MapStyleImageMissingEvent event) {
-          widget.onStyleImageMissing?.call(
+          effectiveWidget.onStyleImageMissing?.call(
             MapEventStyleImageMissing(id: event.id),
           );
         }.toJS,
@@ -204,20 +221,22 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
       _map.on(
         interop.MapEventType.webglContextLost,
         (interop.MapLibreEvent event) {
-          widget.onContextLost?.call(const MapEventContextLost());
+          effectiveWidget.onContextLost?.call(const MapEventContextLost());
         }.toJS,
       );
       _map.on(
         interop.MapEventType.webglContextRestored,
         (interop.MapLibreEvent event) {
-          widget.onContextRestored?.call(const MapEventContextRestored());
+          effectiveWidget.onContextRestored?.call(
+            const MapEventContextRestored(),
+          );
         }.toJS,
       );
       _map.on(
         interop.MapEventType.projectionTransition,
         (interop.MapProjectionEvent event) {
           final projection = event.newProjection.dartify();
-          widget.onProjectionChanged?.call(
+          effectiveWidget.onProjectionChanged?.call(
             MapEventProjectionChanged(
               // gl-js reports a globe that shows Mercator at the current
               // zoom level as `globe-mercator`.
@@ -252,8 +271,10 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
             reason = CameraChangeReason.map;
           }
           _moveReason = reason;
-          widget.onCameraMoveStart?.call(
-            MapEventCameraMoveStart(reason: reason),
+          _report(
+            () => effectiveWidget.onCameraMoveStart?.call(
+              MapEventCameraMoveStart(reason: reason),
+            ),
           );
         }.toJS,
       );
@@ -264,8 +285,11 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
           if (_silentCamera) return;
           final mapCamera = getCamera();
           setState(() => camera = mapCamera);
-          widget.onCameraMove?.call(
-            MapEventCameraMove(camera: mapCamera, reason: _moveReason),
+          final reason = _moveReason;
+          _report(
+            () => effectiveWidget.onCameraMove?.call(
+              MapEventCameraMove(camera: mapCamera, reason: reason),
+            ),
           );
         }.toJS,
       );
@@ -377,6 +401,8 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
     _endAnimation(CameraAnimationResult.cancelled);
     document.removeEventListener('contextmenu', _onContextMenu);
     _contextMenuTimer?.cancel();
+    // Pending annotation work must not reach the map once it is gone.
+    detachAnnotations();
     style?.dispose();
     if (_mapCreated) {
       _map.remove();
@@ -410,8 +436,12 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
       _map.setMaxBounds(options.maxBounds?.toJs());
     }
     if (options.style != oldWidget.options.style) _setStyle(options.style);
-    _updateRenderListener();
     super.didUpdateWidget(oldWidget);
+  }
+
+  @override
+  void didUpdateCallbacks() {
+    if (_mapCreated) _updateRenderListener();
   }
 
   @override
@@ -439,6 +469,37 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
     if (target == null) return stopCamera();
     _nextGestureCausedByController = true;
     _map.jumpTo(target as interop.JumpToOptions);
+  }
+
+  /// Jumps to [camera] while the widget builds, so that GL JS draws it in
+  /// the browser frame that shows this build: with multi-threaded skwasm,
+  /// both show in the next browser frame, as GL JS draws a camera change
+  /// made within a frame in the next one. CanvasKit and single-threaded
+  /// skwasm show the build in the current browser frame, so GL JS redraws
+  /// after the Flutter frame, still in the same browser frame. The redraw
+  /// waits for the frame because it fires `render`, `load` and `idle`
+  /// synchronously, whose callbacks must not run while the widget builds.
+  @override
+  void applyCamera(CameraPosition camera) {
+    if (!_mapCreated) return;
+    final target = _targetReplacing(
+      camera.toCameraUpdate(),
+      CameraAnimationResult.cancelled,
+    );
+    if (target == null) return;
+    _nextGestureCausedByController = true;
+    _applyingCamera = true;
+    try {
+      _map.jumpTo(target as interop.JumpToOptions);
+    } finally {
+      _applyingCamera = false;
+    }
+    if (FrameAlignedGestureCamera.isNeeded || _redrawScheduled) return;
+    _redrawScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _redrawScheduled = false;
+      if (mounted && _mapCreated) _map.redraw();
+    });
   }
 
   @override
@@ -753,28 +814,41 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
 
   void _onLoadingStarted() {
     _loading = true;
-    widget.onLoadingStarted?.call(const MapEventLoadingStarted());
+    effectiveWidget.onLoadingStarted?.call(const MapEventLoadingStarted());
   }
 
   /// Why the camera moves, from the start of the move on.
   CameraChangeReason _moveReason = CameraChangeReason.map;
 
   void _onCameraMoveEnd() {
-    widget.onCameraMoveEnd?.call(
-      MapEventCameraMoveEnd(camera: getCamera(), reason: _moveReason),
+    final event = MapEventCameraMoveEnd(
+      camera: getCamera(),
+      reason: _moveReason,
     );
+    _report(() => effectiveWidget.onCameraMoveEnd?.call(event));
   }
+
+  /// Whether [applyCamera] moves the camera while the widget builds.
+  var _applyingCamera = false;
+
+  /// Whether a redraw of [applyCamera] waits for the end of the frame.
+  var _redrawScheduled = false;
+
+  /// Calls the camera callback [call] right away, or after the build while
+  /// [applyCamera] moves the camera, as callbacks may rebuild other widgets.
+  void _report(void Function() call) =>
+      _applyingCamera ? scheduleMicrotask(call) : call();
 
   /// The listener of the render event, which fires for every frame, so it
   /// is only registered while [MapLibreMap.onRenderFrame] is set.
   JSExportedDartFunction? _renderListener;
 
   void _updateRenderListener() {
-    final listens = widget.onRenderFrame != null;
+    final listens = effectiveWidget.onRenderFrame != null;
     if (listens == (_renderListener != null)) return;
     if (listens) {
       final listener = (interop.MapLibreEvent event) {
-        widget.onRenderFrame?.call(const MapEventRenderFrame());
+        effectiveWidget.onRenderFrame?.call(const MapEventRenderFrame());
       }.toJS;
       _renderListener = listener;
       _map.on(interop.MapEventType.render, listener);
@@ -786,23 +860,12 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
 
   void _onStyleLoaded() {
     style?.dispose();
-    final styleCtrl = StyleControllerWeb(_map)..load();
+    final styleCtrl = StyleControllerWeb(_map, _placementFadeDuration)..load();
     style = styleCtrl;
-    widget.onStyleLoaded?.call(styleCtrl);
+    effectiveWidget.onStyleLoaded?.call(styleCtrl);
     attachAnnotations(styleCtrl);
-    _attributions = styleCtrl.attributions;
     // setState is needed to refresh the flutter widgets used in MapLibreMap.children.
     setState(() {});
-  }
-
-  /// Rebuilds the widgets in [MapLibreMap.children], such as
-  /// `SourceAttribution`, when the attributions of the style changed.
-  void _onAttributionsMaybeChanged() {
-    final style = this.style;
-    if (style == null || !mounted) return;
-    final attributions = style.attributions;
-    if (listEquals(attributions, _attributions)) return;
-    setState(() => _attributions = attributions);
   }
 }
 

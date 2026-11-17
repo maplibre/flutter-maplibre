@@ -8,6 +8,7 @@ import 'package:integration_test/integration_test.dart';
 import 'package:maplibre/maplibre.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'shared/frame_pixels.dart';
 import 'shared/test_map.dart';
 
 void main() {
@@ -1019,6 +1020,215 @@ void runTests() {
         'background',
       ]);
     }, skip: kIsWeb);
+
+    /// A style of one label, 東京, whose glyph server refuses every request,
+    /// so that only the device's fonts can draw it.
+    MapOptions cjkLabel({String? localIdeographFontFamily = 'sans-serif'}) =>
+        MapOptions(
+          style: MapStyle.json(
+            jsonEncode({
+              'version': 8,
+              'glyphs': 'http://127.0.0.1:9/{fontstack}/{range}.pbf',
+              'sources': {
+                'point': {
+                  'type': 'geojson',
+                  'data': {
+                    'type': 'Point',
+                    'coordinates': [0, 0],
+                  },
+                },
+              },
+              'layers': [
+                {
+                  'id': 'label',
+                  'type': 'symbol',
+                  'source': 'point',
+                  'layout': {
+                    'text-field': '東京',
+                    'text-font': ['Noto Sans Regular'],
+                  },
+                },
+              ],
+            }),
+          ),
+          initCamera: const CameraUpdate.position(
+            center: Geographic(lon: 0, lat: 0),
+            zoom: 4,
+          ),
+          localIdeographFontFamily: localIdeographFontFamily,
+        );
+
+    final darwin =
+        !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.macOS);
+
+    testWidgets('draws CJK labels with the device fonts by default', (
+      tester,
+    ) async {
+      final map = await pumpMap(tester, options: cjkLabel());
+      await map.waitForFeatures(
+        map.center,
+        (features) => features.isNotEmpty,
+        layerIds: ['label'],
+      );
+    }, skip: !(kIsWeb || darwin));
+
+    testWidgets('draws no CJK label without glyphs or local fonts', (
+      tester,
+    ) async {
+      // A map with the device fonts first: on iOS and macOS the fonts are the
+      // process's, and the map without them must not inherit them.
+      final local = await pumpMap(tester, options: cjkLabel());
+      await local.waitForFeatures(
+        local.center,
+        (features) => features.isNotEmpty,
+        layerIds: ['label'],
+      );
+      await tester.pumpWidget(const SizedBox());
+
+      final map = await pumpMap(
+        tester,
+        options: cjkLabel(localIdeographFontFamily: null),
+      );
+      // A map whose glyphs fail to load never goes idle; the failure is the
+      // last thing the label waits for.
+      await map.waitForEvent<MapEventError>(
+        where: (event) => event.kind == MapErrorKind.glyphs,
+      );
+      await map.waitForLatestFrame();
+      final features = await map.pumpFuture(
+        map.controller.queryRenderedFeatures(
+          QueryGeometry.point(map.center),
+          layerIds: ['label'],
+        ),
+        reason: 'querying the label',
+      );
+      expect(features, isEmpty);
+    }, skip: !darwin);
+
+    testWidgets('turns label placement transitions off and on', (tester) async {
+      // Native fades labels over the style's transition duration, long
+      // enough here for software renderers to show frames of the fade. Web
+      // fades them over the map's fade duration, 300 ms, and the test reads
+      // every frame there.
+      MapOptions options(String backgroundId) => MapOptions(
+        style: MapStyle.json(
+          jsonEncode({
+            'version': 8,
+            'transition': {'duration': 2000, 'delay': 0},
+            'sources': <String, Object>{},
+            'layers': [
+              {
+                'id': backgroundId,
+                'type': 'background',
+                'paint': {'background-color': '#dddddd'},
+              },
+            ],
+          }),
+        ),
+        initCamera: const CameraUpdate.position(
+          center: Geographic(lon: 0, lat: 0),
+          zoom: 4,
+        ),
+      );
+
+      final map = await pumpMap(tester, options: options('background'));
+      // maplibre-gl-js fades labels only after the map's first idle.
+      await map.waitForEvent<MapEventIdle>();
+      if (kIsWeb) addTearDown(startFramePixels());
+      final bytes = (await rootBundle.load(_markerAsset)).buffer.asUint8List();
+
+      // The center's colors in the frames until it shows the color that
+      // [done] accepts: every frame on web, as often as Flutter can read
+      // them elsewhere. The icon is red, with green 57, over the grey
+      // background, with green 221. A map that already shows that color may
+      // render no further frame.
+      List<int>? shown;
+      Future<List<List<int>>> framesUntil(bool Function(int green) done) async {
+        final frames = <List<int>>[];
+        final deadline = DateTime.now().add(defaultTimeout);
+        while (shown == null || !done(shown![1])) {
+          if (DateTime.now().isAfter(deadline)) {
+            fail('The center never changed, frames: $frames');
+          }
+          await tester.pump(const Duration(milliseconds: 16));
+          final read = kIsWeb ? takeFramePixels() : [await map.pixelAtCenter()];
+          frames.addAll(read);
+          shown = read.lastOrNull ?? shown;
+        }
+        return frames;
+      }
+
+      // Two icons about 51 pixels wide, 40 pixels apart at zoom 4, where the
+      // top one hides the one at the center. At zoom 4.9, 75 pixels apart,
+      // both show. A symbol whose tile was reloaded, as adding a layer does,
+      // shows at once, so the icon is placed by a camera change that loads
+      // no tile.
+      Future<void> addIcons(String imageId) async {
+        await map.style.addImage(imageId, bytes);
+        for (final (id, lon) in [('below', 0.0), ('above', 1.76)]) {
+          await map.style.sources.add(
+            GeoJsonSource.data(
+              id: id,
+              data: _pointData(Geographic(lon: lon, lat: 0)),
+            ),
+          );
+          await map.style.layers.add(
+            SymbolStyleLayer(
+              id: id,
+              sourceId: id,
+              iconImage: .literal(imageId),
+              iconSize: const .literal(0.1),
+            ),
+          );
+        }
+        await map.waitForFeatures(
+          map.center + const Offset(40, 0),
+          (features) => features.isNotEmpty,
+          layerIds: ['above'],
+        );
+        shown = null;
+        await framesUntil((green) => green >= 215);
+      }
+
+      // The frames from zooming in until the icon at the center is drawn in
+      // full, and back out until it is hidden.
+      Future<List<List<int>>> showIcon() async {
+        if (kIsWeb) takeFramePixels();
+        await map.controller.moveCamera(const CameraUpdate.position(zoom: 4.9));
+        final frames = await framesUntil((green) => green <= 70);
+        await map.controller.moveCamera(const CameraUpdate.position(zoom: 4));
+        await framesUntil((green) => green >= 215);
+        return frames;
+      }
+
+      // Frames that show the icon partly faded in.
+      int fading(List<List<int>> frames) =>
+          frames.where((pixel) => pixel[1] > 70 && pixel[1] < 215).length;
+
+      await addIcons('marker');
+      final on = await showIcon();
+      expect(fading(on), greaterThan(0), reason: '$on');
+
+      await map.style.setPlacementTransitions(enabled: false);
+      final off = await showIcon();
+      expect(fading(off), 0, reason: '$off');
+
+      await map.style.setPlacementTransitions(enabled: true);
+      final onAgain = await showIcon();
+      expect(fading(onAgain), greaterThan(0), reason: '$onAgain');
+
+      // A newly loaded style fades labels again.
+      await map.style.setPlacementTransitions(enabled: false);
+      final loads = map.styleLoads;
+      await map.setOptions(options('grey'));
+      await map.waitForStyleLoad(since: loads);
+      // Web keeps the images of the old style, native doesn't.
+      await addIcons('marker-2');
+      final newStyle = await showIcon();
+      expect(fading(newStyle), greaterThan(0), reason: '$newStyle');
+    });
   });
 }
 

@@ -53,6 +53,9 @@ extension type JsMap._(Camera _) implements Camera {
   /// Manually trigger a resize of the map to fit the size of the screen.
   external void resize();
 
+  /// Renders the map right away, instead of in the next animation frame.
+  external void redraw();
+
   /// Clean up and release all internal JS resources associated with this map.
   external void remove();
 
@@ -110,6 +113,15 @@ extension type JsMap._(Camera _) implements Camera {
 
   /// Update the max camera pitch / tilt.
   external void setMaxPitch(double? maxPitch);
+
+  /// The milliseconds that symbol placement changes fade over, 300 by
+  /// default. gl-js only takes it as the `fadeDuration` option and keeps it
+  /// in a private field, which it reads on every frame it renders. Null if a
+  /// gl-js version has no such field.
+  @JS('_fadeDuration')
+  external num? get fadeDuration;
+  @JS('_fadeDuration')
+  external set fadeDuration(num value);
 
   /// Update the maximum bounding box of the map camera.
   external void setMaxBounds(LngLatBounds? maxBounds);
@@ -192,6 +204,12 @@ extension type MapOptions._(JSObject _) implements JSObject {
     bool? interactive,
     JSFunction? transformRequest,
   });
+
+  /// The CSS font-family list that draws CJK ideographs, kana and Hangul
+  /// locally, or `false` or an empty string for the style's glyphs; gl-js
+  /// defaults to `sans-serif`.
+  external JSAny? get localIdeographFontFamily;
+  external set localIdeographFontFamily(JSAny? value);
 }
 
 /// The request that a `transformRequest` callback returns.

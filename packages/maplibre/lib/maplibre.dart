@@ -136,6 +136,7 @@ export 'package:maplibre_platform_interface/maplibre_platform_interface.dart'
         MapLibreNetwork,
         MapMovements,
         MapOptions,
+        MapPlugin,
         MapProjection,
         MapRenderingStats,
         MapResourceKind,
@@ -232,6 +233,8 @@ export 'src/layer/polyline_layer.dart' show PolylineLayer;
 export 'src/location/user_location.dart'
     show UserLocation, UserLocationTracking;
 export 'src/location/user_location_layer.dart' show UserLocationLayer;
+export 'src/location/user_location_style.dart' show UserLocationStyle;
+export 'src/ui/map_align.dart' show MapAlign, MapAlignItem;
 export 'src/ui/map_compass.dart' show MapCompass;
 export 'src/ui/map_control_buttons.dart' show MapControlButtons;
 export 'src/ui/map_scalebar.dart' show MapScalebar, ScaleBarUnit;

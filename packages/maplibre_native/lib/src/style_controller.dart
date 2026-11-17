@@ -12,12 +12,21 @@ import 'package:maplibre_platform_interface/maplibre_platform_interface.dart';
 /// them in.
 class StyleControllerNative extends StyleController implements StyleBackend {
   /// Creates a style controller for a map.
-  StyleControllerNative(this._map, {this.onAttributionsChanged});
+  StyleControllerNative(this._map);
 
   final mln.MapHandle _map;
 
-  /// Called when [refreshAttributions] finds that the attributions changed.
-  final VoidCallback? onAttributionsChanged;
+  /// Keeps the style's transition duration and delay, as the platform SDKs'
+  /// switches did.
+  @override
+  Future<void> setPlacementTransitions({required bool enabled}) async {
+    final options = await _map.getStyleTransitionOptions();
+    // A style set meanwhile has its own options, with them on.
+    if (_replaced) return;
+    await _map.setStyleTransitionOptions(
+      options.copyWith(enablePlacementTransitions: enabled),
+    );
+  }
 
   @override
   late final StyleSources sources = StyleSources(this, layers: () => layers);
@@ -27,6 +36,14 @@ class StyleControllerNative extends StyleController implements StyleBackend {
 
   List<String> _cachedAttributions = const [];
   var _disposed = false;
+
+  /// A newer style was set on the map, so the map's style commands no
+  /// longer reach this one.
+  bool get _replaced => _disposed || _replacedByNewer;
+  var _replacedByNewer = false;
+
+  /// Called when a newer style is set on the map, before its load is queued.
+  void markReplaced() => _replacedByNewer = true;
 
   /// Fills [layers] and [sources] from the style that the map loaded, and
   /// reads its attributions.
@@ -359,7 +376,7 @@ class StyleControllerNative extends StyleController implements StyleBackend {
       return _cachedAttributions;
     }
     _cachedAttributions = attributions;
-    onAttributionsChanged?.call();
+    if (!_disposed) notifyAttributionsChanged();
     return attributions;
   }
 
@@ -385,5 +402,6 @@ class StyleControllerNative extends StyleController implements StyleBackend {
     _disposed = true;
     layers.dispose();
     sources.dispose();
+    super.dispose();
   }
 }

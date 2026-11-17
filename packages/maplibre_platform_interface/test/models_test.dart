@@ -193,6 +193,28 @@ void main() {
     test('leaves FastPFOR decoding off by default, as MapLibre Native', () {
       expect(const MapOptions().fastPforEnabled, isFalse);
     });
+
+    test('draws CJK with the device fonts by default, as gl-js', () {
+      expect(const MapOptions().localIdeographFontFamily, 'sans-serif');
+    });
+
+    test('compares the local ideograph fonts', () {
+      const local = MapOptions(localIdeographFontFamily: 'Hiragino Sans');
+      expect(
+        local,
+        const MapOptions(localIdeographFontFamily: 'Hiragino Sans'),
+      );
+      expect(
+        local.hashCode,
+        const MapOptions(localIdeographFontFamily: 'Hiragino Sans').hashCode,
+      );
+      expect(local, isNot(const MapOptions()));
+      expect(
+        const MapOptions(localIdeographFontFamily: null),
+        isNot(const MapOptions()),
+      );
+      expect(local, isNot(const MapOptions(localIdeographFontFamily: 'serif')));
+    });
   });
 
   group('CameraPosition', () {
@@ -363,6 +385,35 @@ void main() {
       expect(a.hashCode, b.hashCode);
       expect(a, isNot(const MapGestures()));
       expect(a.toString(), contains('scrollWheel: false'));
+    });
+
+    test('waits for a 15 degree twist before rotating by default', () {
+      expect(const MapGestures().rotateThreshold, 15);
+      expect(const MapGestures.none().rotateThreshold, 15);
+      final a = const MapGestures().copyWith(rotateThreshold: 0);
+      expect(a.rotateThreshold, 0);
+      expect(a, isNot(const MapGestures()));
+      expect(a, const MapGestures(rotateThreshold: 0));
+      expect(a.toString(), contains('rotateThreshold: 0'));
+    });
+  });
+
+  group('restrictedBy', () {
+    test('allows what both movements allow', () {
+      expect(
+        const MapMovements(rotate: false)
+            .restrictedBy(const MapMovements(pitch: false)),
+        const MapMovements(rotate: false, pitch: false),
+      );
+    });
+
+    test('allows what both gestures allow and keeps the threshold', () {
+      expect(
+        const MapGestures(fling: false, rotateThreshold: 3).restrictedBy(
+          const MapGestures(doubleTap: false, rotateThreshold: 40),
+        ),
+        const MapGestures(fling: false, doubleTap: false, rotateThreshold: 3),
+      );
     });
   });
 

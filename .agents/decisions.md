@@ -273,6 +273,35 @@ Each entry: the decision, then why.
   gl-js events; per-axis camera events (gl-js `zoomstart`, `rotate` …), raw
   pointer events, box zoom, `styledata` and `dataabort` are left out on
   purpose, and offline events stay on `OfflineManager`.
+- **Plugins are widgets in `MapLibreMap.children`; `MapPlugin` gives them
+  the declarative parameters of `MapLibreMap`.** Layers, `on…` callbacks,
+  `movements` and `gestures` of every `MapPlugin` are combined into one
+  `MapLibreMap` (`MapLibreMapState.effectiveWidget`), which platforms read instead of
+  `widget` and follow in `didUpdateCallbacks`. Plugin layers go after
+  `MapLibreMap.layers` in tree order; input events go to the plugins in
+  hit-test order at the pointer (a drag to the plugins at its start), then
+  to the app; other events go to every plugin in tree order, then the app.
+  No plugin can keep an event from others (no stop-propagation, as in
+  gl-js); `preventDefault` stays on double click and drag start. Movements
+  and gestures are ANDed. Plugins register after a frame (post-frame), so
+  their changes show one frame late. A controller-based `on<T>()` and plugin
+  objects were rejected as imperative; slots by kind (`controls:`,
+  `plugins:`) because one plugin can have layers, events and UI.
+- **`MapLibreInheritedModel` has aspects.** `MapController.of` and
+  `MapOptions.of` rebuild on a new controller, options or style, or when
+  rendering pauses or resumes; `CameraPosition.of` on every camera change;
+  `StyleController.of` on a new style and on every notification of the
+  style. Widgets that show something that moves with the camera must read
+  `CameraPosition.of`.
+- **The style notifies structure, not values.** `StyleLayers` notify on
+  add, remove and move, `StyleSources` on add, remove and changed TileJSON,
+  the `StyleController` on those and on attribution changes (platforms call
+  `notifyAttributionsChanged`). Layer properties and source data don't
+  notify, as apps change them every frame and every `StyleController.of`
+  widget would rebuild with them. The map counts the notifications into the
+  model, after the frame when they come while the tree builds (annotation
+  layers change there). Only the model rebuilds for them (a
+  `ValueListenableBuilder` around it), not the platform widget.
 - **`MapOptions.style` is a sealed `MapStyle` and declarative; there is no
   `setStyle`.** Backends switch on the type instead of guessing from the
   string, and a changed `style` loads the new style.
@@ -370,12 +399,28 @@ Each entry: the decision, then why.
   tile that is not found (404) as empty, so only other failures reach the
   stream as errors.
 
-- **User location is a Flutter layer, `UserLocationLayer`, fed by a
-  `Stream<UserLocation>`; there is no `PermissionManager`.** It paints in
-  Dart, so it works the same on every platform, and tracking runs in Dart
-  over `animateCamera`. A translucent `Listener` stops the tracking on a drag
-  or wheel. Permissions are left to `geolocator` or `permission_handler`;
+- **User location is a `MapPlugin`, `UserLocationLayer`, fed by a
+  `Stream<UserLocation>`; there is no `PermissionManager`.** Tracking runs in
+  Dart over `animateCamera`, and the plugin's `onCameraMoveStart` stops it
+  when a gesture moves the map. Permissions are left to `geolocator` or `permission_handler`;
   `maplibre_geolocator` adapts `geolocator` positions.
+- **The user location is drawn with style layers, styled by a
+  `UserLocationStyle` (user decision on #689: one `style` object in the
+  Flutter convention, no choice of renderer).** Style layers draw in the
+  map's own frame, where a widget trails gl-js camera animations on web
+  (every tracking `fly`) and can be a frame off on Android; the accuracy
+  circle (`circle-pitch-alignment/scale: map`) and the heading
+  (`icon-pitch-alignment: map`) also lie flat on a tilted map. The Android
+  SDK's default `LocationComponent` renderer uses a GeoJSON source and style
+  layers too. The layers are `MapPlugin.layers`, so they stay on every style;
+  each is a private type of its own, so that the generated ids match them
+  again on every fix, and the plugin gets the same instances while nothing
+  changed. The layer doesn't depend on `CameraPosition.of`, so it doesn't
+  rebuild while the camera moves. Each fix writes the one-feature sources
+  once; nothing changes per frame, so the dot jumps from fix to fix as in
+  gl-js. The accuracy radius is an exponential zoom interpolation of meters
+  over 512 px tiles at the fix's latitude. The heading cone is a PNG drawn
+  once per color at pixel ratio 3 and scaled by `radius / 8`.
 
 - **Expressions are a sealed `Expression<T>` of `Literal`, `Call` and
   `RawValue`, with static members and extensions, and layer properties take
@@ -505,6 +550,54 @@ Each entry: the decision, then why.
   update per frame re-encodes the data in Dart, parses and indexes it on the
   UI thread (`geojsonSourceDataCreate` is synchronous) and re-tiles the
   source; a paint change does none of that.
+- **`MapOptions.localIdeographFontFamily` is a per-map CSS font-family list,
+  as gl-js's option, and defaults to `'sans-serif'`, as gl-js and MapLibre's
+  iOS and Android SDKs draw CJK locally by default.** Null (`false` to
+  gl-js) or an empty string draws the style's glyphs on every platform. On
+  iOS and macOS the C library's local glyph rasterizer reads its fonts from
+  the `MLNIdeographicFontFamilyName` user default when the session's
+  renderer is created, on its first frame (the C API passes none, see Known
+  gaps), so the Darwin target registers a value just before every session
+  attaches, in the registration domain, which is the process's and never
+  written to disk: the names, or `@NO` for null, since the rasterizer reads
+  the key with `stringArrayForKey:` and is on for any array, even an empty
+  one. A map without the fonts thus never inherits another map's. A generic
+  sans-serif family stands for the system font's family, as MapLibre's iOS
+  and macOS SDKs pass it by default, and the plugin reads it through Core
+  Text, which any thread may call; other generic families reach Core Text
+  as literal names. The rasterizer puts the layer's `text-font` names before
+  these. The other native platforms have no local rasterizer.
+- **`StyleController.setPlacementTransitions` mirrors the C API's
+  `StyleTransitionOptions.enablePlacementTransitions`.** Native keeps the
+  style's transition duration and delay. gl-js only takes `fadeDuration` as
+  a constructor option and keeps it in the private `_fadeDuration`, which it
+  reads on every frame, so web sets that field: 0 off, the map's own value
+  on. Honouring it only when the map is created would make the switch do
+  nothing on web afterwards; the integration test fails if gl-js renames the
+  field. A newly loaded style has them on again on both platforms. Native
+  fades over the style's transition duration, web over the map's 300 ms,
+  which gl-js also times pattern and dash crossfades with, so off ends those
+  too on web.
+
+- **An app drives the camera through the named constructor
+  `MapLibreMap.withCamera(camera: …)`, not an optional `camera` parameter of
+  the default constructor.** The user found a parameter too prominent for an
+  edge case (flutter_map as root, syncing maps, custom gesture layers). Each
+  new camera is applied in `didUpdateWidget`, so it reaches the map while the
+  widget builds: native submits it without waiting
+  (`discarding.updateCamera`), and `CameraPosition.of` still follows the frame
+  on screen. On web it jumps in build. Multi-threaded skwasm shows a Flutter
+  frame one browser frame after it was built, and GL JS draws a change made
+  within a frame in the next one, so both match. CanvasKit and
+  single-threaded skwasm show the build in the current browser frame, so GL
+  JS redraws in a post-frame callback, which runs in the same rAF. Not in
+  build, because `redraw()` fires `render`, `load` and `idle` synchronously,
+  and their callbacks may rebuild other widgets. Camera callbacks fired by
+  the jump are deferred to a microtask for the same reason. The gestures
+  don't move the camera while it is set (movements are none); the
+  controller still can, until the next change. Presenting frames in build
+  through one texture per ring slot would close the remaining one-frame race
+  on native, but changes how every map presents, so it is not done.
 
 ## Gestures
 
@@ -681,6 +774,16 @@ Each entry: the decision, then why.
   wheel delta by the device pixel ratio except on macOS, so the recognizer
   multiplies it back); a trackpad pinch that arrives as a scale signal
   zooms by its scale.
+- **A pinch rotates only after its fingers twist
+  `MapGestures.rotateThreshold` degrees (default 15) since it started.** The
+  twist below it is dropped, so the map doesn't jump; zoom and pan are never
+  held back. GL JS waits for 25 px along the circle of the fingers (about 14°
+  at 200 px apart); MapLibre Android waits 3° to 15° depending on speed and
+  turns rotation off once a zoom starts first; iOS waits 3° while zooming;
+  flutter_map waits 20° only with `enableMultiFingerGestureRace`, where the
+  first gesture past its threshold locks the others out. A fixed angle is
+  easier to explain and set than GL JS's distance, and locking rotation out
+  after a zoom would make zooming and turning at once impossible.
 - **A long click is a hold of one finger.** Flutter's long press recognizer
   times the first pointer alone and wins the arena when its deadline passes,
   whatever else landed, so two fingers resting on the map before a pinch were
@@ -765,6 +868,16 @@ Each entry: the decision, then why.
   the move. Hit testing of annotation layers therefore ranks hits by the
   index in `style.layers`, and the integration test checks the order by
   color.
+- `maplibre_native_ffi` has no local font option, although MapLibre Native's
+  renderer takes a local font family. On iOS and macOS the local glyph
+  rasterizer also reads the `MLNIdeographicFontFamilyName` user default,
+  which `localIdeographFontFamily` sets before each session attaches. The
+  renderer reads it at the session's first frame, and it is the process's,
+  so a map that attaches with different fonts before another map's first
+  frame gives that map its fonts. It is registered in the registration
+  domain, so a value the app stores under that key, or passes as a launch
+  argument, overrides the option. Android, Windows and Linux draw the
+  style's glyphs.
 - MapLibre Native moves to the style's camera on load only while no camera
   change happened, and `mln_map_set_bounds` counts as one (it always passes
   bounds, even `unbounded`). The C API has no getter for the style's camera.

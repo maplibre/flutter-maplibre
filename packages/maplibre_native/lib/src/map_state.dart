@@ -100,8 +100,9 @@ class MapLibreMapStateNative extends MapLibreMapState {
       // renders, so its first frame shows them.
       final renderer = await MapRenderer.create(
         extent: extent,
-        eventMask: _eventMask = widget.eventMask,
+        eventMask: _eventMask = effectiveWidget.eventMask,
         fastPforEnabled: options.fastPforEnabled,
+        localIdeographFontFamily: options.localIdeographFontFamily,
         setUp: _setUp,
         onEvent: _onRuntimeEvent,
         onFrameShown: _onFrameShown,
@@ -115,7 +116,7 @@ class MapLibreMapStateNative extends MapLibreMapState {
         camera = _readCamera();
         isInitialized = true;
       });
-      widget.onMapCreated?.call(this);
+      effectiveWidget.onMapCreated?.call(this);
       // Events that arrived meanwhile, such as the style load, follow
       // onMapCreated.
       renderer.start();
@@ -135,13 +136,12 @@ class MapLibreMapStateNative extends MapLibreMapState {
   Future<void> _setUp(mln.MapHandle map) async {
     _map = map;
     // The callbacks may have changed while the map was being created.
-    final eventMask = widget.eventMask;
+    final eventMask = effectiveWidget.eventMask;
     if (eventMask != _eventMask) {
       _eventMask = eventMask;
       map.discarding.setEventMask(eventMask);
     }
-    final options = this.options;
-    final initCamera = options.initCamera;
+    final initCamera = initialCamera;
     // Without an initial camera, MapLibre Native moves to the camera of the
     // style once it loads, but only while no camera change happened. Setting
     // camera constraints is one, so they follow the first style.
@@ -202,13 +202,30 @@ class MapLibreMapStateNative extends MapLibreMapState {
     if (oldWidget.options.style != options.style) {
       unawaited(_setStyle(options.style));
     }
-    final eventMask = widget.eventMask;
-    final map = _map;
-    if (eventMask != _eventMask && map != null) {
-      _eventMask = eventMask;
-      map.discarding.setEventMask(eventMask);
-    }
     super.didUpdateWidget(oldWidget);
+  }
+
+  /// Submits [camera] without waiting, so the map renders it next, in
+  /// order with every later command.
+  @override
+  void applyCamera(CameraPosition camera) {
+    final map = _map;
+    if (map == null) return;
+    _cancelAnimation();
+    _nextChangeReason = CameraChangeReason.programmatic;
+    map.discarding.updateCamera(
+      mln.CameraUpdate(camera: camera.toCameraUpdate().toMln()),
+    );
+  }
+
+  @override
+  void didUpdateCallbacks() {
+    final eventMask = effectiveWidget.eventMask;
+    final handle = _map;
+    if (eventMask != _eventMask && handle != null) {
+      _eventMask = eventMask;
+      handle.discarding.setEventMask(eventMask);
+    }
   }
 
   @override
@@ -216,6 +233,8 @@ class MapLibreMapStateNative extends MapLibreMapState {
     _disposed = true;
     _animation?.end(CameraAnimationResult.cancelled);
     _animation = null;
+    // Pending annotation work must not reach the map once it is gone.
+    detachAnnotations();
     style?.dispose();
     _loadingStyle?.dispose();
     _invalidateProjection();
@@ -241,7 +260,9 @@ class MapLibreMapStateNative extends MapLibreMapState {
                 : CameraChangeReason.map);
         _nextChangeReason = null;
         _moveReason = reason;
-        widget.onCameraMoveStart?.call(MapEventCameraMoveStart(reason: reason));
+        effectiveWidget.onCameraMoveStart?.call(
+          MapEventCameraMoveStart(reason: reason),
+        );
       case mln.RuntimeEventType.mapCameraIsChanging:
         _onCameraChanged();
       case mln.RuntimeEventType.mapCameraDidChange:
@@ -258,11 +279,11 @@ class MapLibreMapStateNative extends MapLibreMapState {
       case mln.RuntimeEventType.mapStyleLoaded:
         unawaited(_onStyleLoaded());
       case mln.RuntimeEventType.mapIdle:
-        widget.onIdle?.call(const MapEventIdle());
+        effectiveWidget.onIdle?.call(const MapEventIdle());
       case mln.RuntimeEventType.mapSourceChanged:
         // A source learns its attribution once its tile set loads.
         unawaited(style?.refreshAttributions());
-        final onSourceChanged = widget.onSourceChanged;
+        final onSourceChanged = effectiveWidget.onSourceChanged;
         if (onSourceChanged == null) return;
         if (event.payload case mln.RuntimeEventPayloadSourceChanged(
           :final value,
@@ -278,11 +299,13 @@ class MapLibreMapStateNative extends MapLibreMapState {
       case mln.RuntimeEventType.mapSpriteError:
         _onError(MapErrorKind.sprite, event.message);
       case mln.RuntimeEventType.mapLoadingStarted:
-        widget.onLoadingStarted?.call(const MapEventLoadingStarted());
+        effectiveWidget.onLoadingStarted?.call(const MapEventLoadingStarted());
       case mln.RuntimeEventType.mapLoadingFinished:
-        widget.onLoadingFinished?.call(const MapEventLoadingFinished());
+        effectiveWidget.onLoadingFinished?.call(
+          const MapEventLoadingFinished(),
+        );
       case mln.RuntimeEventType.mapStyleImageMissing:
-        final onStyleImageMissing = widget.onStyleImageMissing;
+        final onStyleImageMissing = effectiveWidget.onStyleImageMissing;
         if (onStyleImageMissing == null) return;
         if (event.payload case mln.RuntimeEventPayloadStyleImage(
           :final value,
@@ -290,7 +313,7 @@ class MapLibreMapStateNative extends MapLibreMapState {
           onStyleImageMissing(MapEventStyleImageMissing(id: value.imageId));
         }
       case mln.RuntimeEventType.mapTileAction:
-        final onTile = widget.onTile;
+        final onTile = effectiveWidget.onTile;
         final action = switch (event.payload) {
           mln.RuntimeEventPayloadTileAction(:final value) => value,
           _ => null,
@@ -310,7 +333,7 @@ class MapLibreMapStateNative extends MapLibreMapState {
           ),
         );
       case mln.RuntimeEventType.mapRenderFrameFinished:
-        final onRenderFrame = widget.onRenderFrame;
+        final onRenderFrame = effectiveWidget.onRenderFrame;
         final frame = switch (event.payload) {
           mln.RuntimeEventPayloadRenderFrame(:final value) => value,
           _ => null,
@@ -329,10 +352,12 @@ class MapLibreMapStateNative extends MapLibreMapState {
         );
       case mln.RuntimeEventType.mapRenderMapFinished:
         // The C API reports only fully rendered maps here.
-        widget.onRenderMap?.call(const MapEventRenderMap(fullyRendered: true));
+        effectiveWidget.onRenderMap?.call(
+          const MapEventRenderMap(fullyRendered: true),
+        );
       case mln.RuntimeEventType.mapGlyphsRequested ||
           mln.RuntimeEventType.mapGlyphsLoaded:
-        final onGlyphs = widget.onGlyphs;
+        final onGlyphs = effectiveWidget.onGlyphs;
         final glyphs = switch (event.payload) {
           mln.RuntimeEventPayloadGlyphs(:final value) => value,
           _ => null,
@@ -350,7 +375,7 @@ class MapLibreMapStateNative extends MapLibreMapState {
         );
       case mln.RuntimeEventType.mapSpriteRequested ||
           mln.RuntimeEventType.mapSpriteLoaded:
-        final onSprite = widget.onSprite;
+        final onSprite = effectiveWidget.onSprite;
         final sprite = switch (event.payload) {
           mln.RuntimeEventPayloadSprite(:final value) => value,
           _ => null,
@@ -373,7 +398,7 @@ class MapLibreMapStateNative extends MapLibreMapState {
   /// Reports an error to [MapLibreMap.onError], or prints it while no
   /// callback is set, so it is never lost.
   void _onError(MapErrorKind kind, String message) {
-    final onError = widget.onError;
+    final onError = effectiveWidget.onError;
     if (onError == null) {
       debugPrint('maplibre_native: $message');
       return;
@@ -392,7 +417,7 @@ class MapLibreMapStateNative extends MapLibreMapState {
     final newCamera = _readCamera();
     if (newCamera == null || newCamera == _eventCamera) return;
     _eventCamera = newCamera;
-    widget.onCameraMove?.call(
+    effectiveWidget.onCameraMove?.call(
       MapEventCameraMove(camera: newCamera, reason: _moveReason),
     );
   }
@@ -419,7 +444,7 @@ class MapLibreMapStateNative extends MapLibreMapState {
   void _onCameraIdle() {
     if (!_cameraMoving) return;
     _cameraMoving = false;
-    final onCameraMoveEnd = widget.onCameraMoveEnd;
+    final onCameraMoveEnd = effectiveWidget.onCameraMoveEnd;
     final camera = _readCamera();
     if (onCameraMoveEnd == null || camera == null) return;
     onCameraMoveEnd(MapEventCameraMoveEnd(camera: camera, reason: _moveReason));
@@ -482,15 +507,7 @@ class MapLibreMapStateNative extends MapLibreMapState {
     detachAnnotations();
     style?.dispose();
     style = null;
-    late final StyleControllerNative styleController;
-    styleController = StyleControllerNative(
-      map,
-      // Rebuilds the widgets in MapLibreMap.children, such as
-      // SourceAttribution.
-      onAttributionsChanged: () {
-        if (mounted && style == styleController) setState(() {});
-      },
-    );
+    final styleController = StyleControllerNative(map);
     _loadingStyle = styleController;
     // The style is only handed out once its layers and sources are known.
     await styleController.load();
@@ -500,7 +517,7 @@ class MapLibreMapStateNative extends MapLibreMapState {
     }
     _loadingStyle = null;
     style = styleController;
-    widget.onStyleLoaded?.call(styleController);
+    effectiveWidget.onStyleLoaded?.call(styleController);
     attachAnnotations(styleController);
     // Refresh the widgets in MapLibreMap.children.
     setState(() {});
@@ -729,16 +746,8 @@ class MapLibreMapStateNative extends MapLibreMapState {
     CameraUpdate update,
   ) async {
     switch (update) {
-      case CameraUpdatePosition(:final center, :final padding, :final anchor):
-        return mln.CameraOptions(
-          center: center?.toMln(),
-          zoom: update.zoom,
-          bearing: update.bearing,
-          pitch: update.pitch,
-          roll: update.roll,
-          padding: padding?.toMln(),
-          anchor: anchor?.toMln(),
-        );
+      case CameraUpdatePosition():
+        return update.toMln();
       case CameraUpdateFit():
         final fitOptions = mln.CameraFitOptions(
           padding: update.padding.toMln(),
@@ -786,6 +795,8 @@ class MapLibreMapStateNative extends MapLibreMapState {
     if (map == null) return;
     final request = ++_styleRequest;
     bool stale() => _map != map || request != _styleRequest;
+    this.style?.markReplaced();
+    _loadingStyle?.markReplaced();
     detachAnnotations();
     final Future<mln.CommandCompletion> load;
     switch (style) {
@@ -872,8 +883,13 @@ class _NativeGestureCamera implements GestureCameraSink {
 
   @override
   void gestureStart() {
+    // Ends a running camera animation or fling as its own move, so that the
+    // gesture starts a move of its own with the reason gesture. The runtime
+    // reports the end of the cancelled transition only later, once the
+    // gesture is active, which would otherwise keep the old move going.
     _state
       .._cancelAnimation()
+      .._onCameraIdle()
       .._gestureActive = true
       .._nextChangeReason = CameraChangeReason.gesture;
     _state._applyDelta(

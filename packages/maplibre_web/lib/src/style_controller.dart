@@ -2,10 +2,22 @@ part of 'map_state.dart';
 
 /// Web specific implementation of the [StyleController].
 class StyleControllerWeb extends StyleController implements StyleBackend {
-  /// Create a new [StyleControllerWeb] instance.
-  StyleControllerWeb(this._map);
+  /// Create a new [StyleControllerWeb] instance for the style that [_map]
+  /// loaded, whose label placement transitions are on and fade over
+  /// [_placementFadeDuration] milliseconds.
+  StyleControllerWeb(this._map, this._placementFadeDuration) {
+    _map.fadeDuration = _placementFadeDuration;
+  }
 
   final interop.JsMap _map;
+  final num _placementFadeDuration;
+
+  /// Sets gl-js's fade duration, which the map reads on every frame: 0 shows
+  /// and hides symbols at once and places them on every frame.
+  @override
+  Future<void> setPlacementTransitions({required bool enabled}) async {
+    _map.fadeDuration = enabled ? _placementFadeDuration : 0;
+  }
 
   @override
   late final StyleSources sources = StyleSources(this, layers: () => layers);
@@ -24,6 +36,7 @@ class StyleControllerWeb extends StyleController implements StyleBackend {
     if (json case {'layers': final List<Object?> styleLayers}) {
       layers.load(styleLayers.whereType<Map<String, Object?>>());
     }
+    _attributions = attributions;
   }
 
   /// Reads what the tile sources of the map learned from their TileJSON into
@@ -164,6 +177,17 @@ class StyleControllerWeb extends StyleController implements StyleBackend {
     String url,
     Map<String, Object?> specification,
   ) async => _map.getSource(id)!.setUrl(url);
+
+  List<String> _attributions = const [];
+
+  /// Notifies the listeners if [attributions] changed since the last check,
+  /// on the events on which the gl-js attribution control updates.
+  void checkAttributions() {
+    final attributions = this.attributions;
+    if (listEquals(attributions, _attributions)) return;
+    _attributions = attributions;
+    notifyAttributionsChanged();
+  }
 
   @override
   List<String> get attributions {
@@ -336,6 +360,7 @@ class StyleControllerWeb extends StyleController implements StyleBackend {
       URL.revokeObjectURL(url);
     }
     _blobUrls.clear();
+    super.dispose();
   }
 
   /// A blob URL of a PNG of the image of [provider].
