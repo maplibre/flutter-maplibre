@@ -6,7 +6,7 @@ issue_tracker: https://github.com/maplibre/flutter-maplibre/issues
 homepage: https://maplibre.org/flutter-maplibre
 documentation: https://maplibre.org/flutter-maplibre/docs/
 
-topics: [ map, maplibre, mvt ]
+topics: [ map, maplibre, mvt, vector-tiles ]
 
 funding:
   - https://github.com/sponsors/maplibre
