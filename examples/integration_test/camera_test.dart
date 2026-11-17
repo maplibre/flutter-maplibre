@@ -409,5 +409,50 @@ void runTests() {
       await map.setCamera(at(15));
       await map.waitForFrame((shown) => near(shown, at(15)));
     });
+
+    testWidgets('map callbacks may rebuild the app while the camera moves', (
+      tester,
+    ) async {
+      var lon = 0.0;
+      var idles = 0;
+      var frames = 0;
+      late StateSetter rebuild;
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              return MapLibreMap.withCamera(
+                camera: at(lon),
+                options: offlineOptions(),
+                onIdle: (_) => rebuild(() => idles++),
+                onRenderFrame: (_) => rebuild(() => frames++),
+              );
+            },
+          ),
+        ),
+      );
+      final deadline = DateTime.now().add(defaultTimeout);
+      while (idles == 0) {
+        if (DateTime.now().isAfter(deadline)) fail('The map never got idle');
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      final idlesBefore = idles;
+      for (var i = 1; i <= 10; i++) {
+        rebuild(() => lon = i.toDouble());
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(tester.takeException(), isNull);
+      }
+      final idleDeadline = DateTime.now().add(defaultTimeout);
+      while (idles == idlesBefore) {
+        if (DateTime.now().isAfter(idleDeadline)) {
+          fail('The map never got idle after the moves');
+        }
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(tester.takeException(), isNull);
+      expect(frames, greaterThan(0));
+    });
   });
 }

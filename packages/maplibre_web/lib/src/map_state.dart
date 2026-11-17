@@ -476,7 +476,9 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
   /// both show in the next browser frame, as GL JS draws a camera change
   /// made within a frame in the next one. CanvasKit and single-threaded
   /// skwasm show the build in the current browser frame, so GL JS redraws
-  /// right away.
+  /// after the Flutter frame, still in the same browser frame. The redraw
+  /// waits for the frame because it fires `render`, `load` and `idle`
+  /// synchronously, whose callbacks must not run while the widget builds.
   @override
   void applyCamera(CameraPosition camera) {
     if (!_mapCreated) return;
@@ -489,10 +491,15 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
     _applyingCamera = true;
     try {
       _map.jumpTo(target as interop.JumpToOptions);
-      if (!FrameAlignedGestureCamera.isNeeded) _map.redraw();
     } finally {
       _applyingCamera = false;
     }
+    if (FrameAlignedGestureCamera.isNeeded || _redrawScheduled) return;
+    _redrawScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _redrawScheduled = false;
+      if (mounted && _mapCreated) _map.redraw();
+    });
   }
 
   @override
@@ -823,6 +830,9 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
 
   /// Whether [applyCamera] moves the camera while the widget builds.
   var _applyingCamera = false;
+
+  /// Whether a redraw of [applyCamera] waits for the end of the frame.
+  var _redrawScheduled = false;
 
   /// Calls the camera callback [call] right away, or after the build while
   /// [applyCamera] moves the camera, as callbacks may rebuild other widgets.

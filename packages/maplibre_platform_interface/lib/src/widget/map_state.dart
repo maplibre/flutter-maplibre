@@ -83,8 +83,10 @@ abstract class MapLibreMapState extends State<MapLibreMap>
     super.didUpdateWidget(oldWidget);
     _annotations.update(effectiveWidget.layers);
     if (oldWidget.paused != widget.paused) _updateRenderingPaused();
-    final camera = widget.camera;
-    if (camera != null && camera != oldWidget.camera) applyCamera(camera);
+    final targetCamera = widget.camera;
+    if (targetCamera != null && targetCamera != oldWidget.camera) {
+      applyCamera(targetCamera);
+    }
     // Plugins among the new children may have moved.
     if (!identical(oldWidget.children, widget.children) &&
         _plugins.entries.length > 1) {

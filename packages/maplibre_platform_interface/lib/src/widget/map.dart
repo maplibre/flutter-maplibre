@@ -102,6 +102,10 @@ class MapLibreMap extends StatefulWidget {
   /// app that drives the camera itself, such as another map whose camera
   /// this one follows, or a custom gesture layer. Null for every other map.
   ///
+  /// It is the camera the app asks for. [MapController.camera] and
+  /// [CameraPosition.of] are the camera of the frame on screen, which
+  /// reaches it a frame or two later on every platform but web.
+  ///
   /// While it is set, the map shows this camera from its first frame on and
   /// the map gestures don't move the camera, as if [MapOptions.movements]
   /// were [MapMovements.none]. Each new camera is applied while the widget

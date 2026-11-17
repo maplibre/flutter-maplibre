@@ -164,4 +164,14 @@ void main() {
     await drag(tester);
     expect(platform.sink.panned, Offset.zero);
   });
+
+  testWidgets('a live map switches to the camera of withCamera', (
+    tester,
+  ) async {
+    await pumpMap(tester);
+    await pumpMap(tester, camera: _camera(5));
+    expect(platform.state.applied, [_camera(5)]);
+    await drag(tester);
+    expect(platform.sink.panned, Offset.zero);
+  });
 }

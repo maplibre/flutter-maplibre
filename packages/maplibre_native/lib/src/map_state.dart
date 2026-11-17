@@ -213,7 +213,9 @@ class MapLibreMapStateNative extends MapLibreMapState {
     if (map == null) return;
     _cancelAnimation();
     _nextChangeReason = CameraChangeReason.programmatic;
-    map.discarding.updateCamera(mln.CameraUpdate(camera: camera.toMln()));
+    map.discarding.updateCamera(
+      mln.CameraUpdate(camera: camera.toCameraUpdate().toMln()),
+    );
   }
 
   @override
@@ -744,16 +746,8 @@ class MapLibreMapStateNative extends MapLibreMapState {
     CameraUpdate update,
   ) async {
     switch (update) {
-      case CameraUpdatePosition(:final center, :final padding, :final anchor):
-        return mln.CameraOptions(
-          center: center?.toMln(),
-          zoom: update.zoom,
-          bearing: update.bearing,
-          pitch: update.pitch,
-          roll: update.roll,
-          padding: padding?.toMln(),
-          anchor: anchor?.toMln(),
-        );
+      case CameraUpdatePosition():
+        return update.toMln();
       case CameraUpdateFit():
         final fitOptions = mln.CameraFitOptions(
           padding: update.padding.toMln(),
