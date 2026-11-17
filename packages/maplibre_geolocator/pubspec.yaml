@@ -17,7 +17,7 @@ resolution: workspace
 dependencies:
   flutter: { sdk: flutter }
   geolocator: ^14.0.2
-  maplibre: ^0.4.0-pre.3
+  maplibre: ^0.4.0
 
 dev_dependencies:
   flutter_test: { sdk: flutter }
