@@ -97,44 +97,6 @@ binding. `maplibre_web` uses
 [maplibre-gl-js](https://github.com/maplibre/maplibre-gl-js). You only add
 `maplibre` to your app.
 
-## maplibre or maplibre_gl?
-
-There are two Flutter packages for MapLibre. They take different approaches:
-
-|                 | `maplibre` (this package)                                   | `maplibre_gl`                                                   |
-|-----------------|-------------------------------------------------------------|-----------------------------------------------------------------|
-| Principle       | What can be done in Dart is done in Dart                    | What the MapLibre SDKs can do is done by the SDKs               |
-| Platforms       | Android, iOS, macOS, Windows, Linux, web                    | Android, iOS, web                                               |
-| Interop         | FFI, JS interop on web                                      | Platform channels, JS interop on web                            |
-| Map in Flutter  | `Texture`, HTML element on web                              | Platform view, HTML element on web                              |
-| API             | Declarative annotations and an imperative controller, synchronous where possible | Imperative controller, asynchronous                             |
-
-The
-[comparison](https://maplibre.org/flutter-maplibre/compare/) covers other map
-packages as well.
-
-## ❤️ Development & Contributing
-
-All kinds of contributions are welcome. Thanks a lot if you consider to
-contribute in any way! There are different ways how you can help the
-development:
-
-- 🌟 Give the project on [GitHub](https://github.com/maplibre/flutter-maplibre) a
-  star and like it on [pub.dev](https://pub.dev/packages/maplibre). This helps
-  the package to grow!
-- 🪴 Use the package in your project
-  and [share feedback](https://github.com/maplibre/flutter-maplibre/discussions/categories/show-and-tell).
-- 🐛
-  Open [bug reports](https://github.com/maplibre/flutter-maplibre/issues/new?assignees=&labels=bug&projects=&template=1-bug.yml)
-  in case you find any.
-- 💡 If you need a specific
-  feature, [open a feature request](https://github.com/maplibre/flutter-maplibre/issues/new?assignees=&labels=feature&projects=&template=2-feature.yml&title=%5BFEATURE%5D+%3Ctitle%3E).
-  or [post your idea as discussion](https://github.com/maplibre/flutter-maplibre/discussions/categories/ideas).
-- 💬 Use the [invite link](https://slack.openstreetmap.us) to chat with us on Slack in the `#flutter-maplibre` channel.
-- 📖 Enhance the package documentation.
-- 💝 Sponsor MapLibre on [GitHub Sponsors](https://github.com/sponsors/maplibre)
-  or [Open Collective](https://opencollective.com/maplibre).
-
 ## 👀 Preview Images
 
 <table>
@@ -195,6 +157,44 @@ development:
     </tr>
   </tbody>
 </table>
+
+## maplibre or maplibre_gl?
+
+There are two Flutter packages for MapLibre. They take different approaches:
+
+|                 | `maplibre` (this package)                                   | `maplibre_gl`                                                   |
+|-----------------|-------------------------------------------------------------|-----------------------------------------------------------------|
+| Principle       | What can be done in Dart is done in Dart                    | What the MapLibre SDKs can do is done by the SDKs               |
+| Platforms       | Android, iOS, macOS, Windows, Linux, web                    | Android, iOS, web                                               |
+| Interop         | FFI, JS interop on web                                      | Platform channels, JS interop on web                            |
+| Map in Flutter  | `Texture`, HTML element on web                              | Platform view, HTML element on web                              |
+| API             | Declarative annotations and an imperative controller, synchronous where possible | Imperative controller, asynchronous                             |
+
+The
+[comparison](https://maplibre.org/flutter-maplibre/compare/) covers other map
+packages as well.
+
+## ❤️ Development & Contributing
+
+All kinds of contributions are welcome. Thanks a lot if you consider to
+contribute in any way! There are different ways how you can help the
+development:
+
+- 🌟 Give the project on [GitHub](https://github.com/maplibre/flutter-maplibre) a
+  star and like it on [pub.dev](https://pub.dev/packages/maplibre). This helps
+  the package to grow!
+- 🪴 Use the package in your project
+  and [share feedback](https://github.com/maplibre/flutter-maplibre/discussions/categories/show-and-tell).
+- 🐛
+  Open [bug reports](https://github.com/maplibre/flutter-maplibre/issues/new?assignees=&labels=bug&projects=&template=1-bug.yml)
+  in case you find any.
+- 💡 If you need a specific
+  feature, [open a feature request](https://github.com/maplibre/flutter-maplibre/issues/new?assignees=&labels=feature&projects=&template=2-feature.yml&title=%5BFEATURE%5D+%3Ctitle%3E).
+  or [post your idea as discussion](https://github.com/maplibre/flutter-maplibre/discussions/categories/ideas).
+- 💬 Use the [invite link](https://slack.openstreetmap.us) to chat with us on Slack in the `#flutter-maplibre` channel.
+- 📖 Enhance the package documentation.
+- 💝 Sponsor MapLibre on [GitHub Sponsors](https://github.com/sponsors/maplibre)
+  or [Open Collective](https://opencollective.com/maplibre).
 
 ## 😎 A huge thanks to all contributors!
 
