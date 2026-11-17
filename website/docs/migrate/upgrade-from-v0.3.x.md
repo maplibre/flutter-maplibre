@@ -8,15 +8,14 @@ icon: lucide/arrow-up-right
 The 0.4 series replaces the MapLibre Android and iOS SDKs and the WebView
 desktop integration with one implementation on the
 [MapLibre Native C API](https://github.com/maplibre/maplibre-native-ffi). It
-also makes style layers, expressions, sources and map options typed. This
-guide applies to the `0.4.0-pre.*` pre-releases and to 0.4.0. The
+also makes style layers, expressions, sources and map options typed. The
 [changelog](https://pub.dev/packages/maplibre/changelog) lists every change.
 
 ## 1. Update the dependency
 
 ```yaml title="pubspec.yaml"
 dependencies:
-  maplibre: ^0.4.0-pre.3
+  maplibre: ^0.4.0
 ```
 
 The packages need Dart 3.13 and Flutter 3.47 or newer.
