@@ -4,7 +4,7 @@
 
 # MapLibre Flutter
 
-[![Pub Version](https://img.shields.io/pub/v/maplibre)](https://pub.dev/packages/maplibre)
+[![Pub Version](https://img.shields.io/pub/v/maplibre?include_prereleases)](https://pub.dev/packages/maplibre)
 [![stars](https://img.shields.io/github/stars/maplibre/flutter-maplibre?style=flat&logo=github)](https://github.com/maplibre/flutter-maplibre)
 [![likes](https://img.shields.io/pub/likes/maplibre?logo=flutter)](https://pub.dev/packages/maplibre)
 [![Pub Points](https://img.shields.io/pub/points/maplibre)](https://pub.dev/packages/maplibre/score)

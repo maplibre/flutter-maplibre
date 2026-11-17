@@ -22,7 +22,7 @@ server. `maplibre` needs no API key of its own and has no vendor lock-in.
 </div>
 
 <div class="ml-badges" markdown>
-[![Pub Version](https://img.shields.io/pub/v/maplibre)](https://pub.dev/packages/maplibre)
+[![Pub Version](https://img.shields.io/pub/v/maplibre?include_prereleases)](https://pub.dev/packages/maplibre)
 [![likes](https://img.shields.io/pub/likes/maplibre?logo=flutter)](https://pub.dev/packages/maplibre)
 [![stars](https://img.shields.io/github/stars/maplibre/flutter-maplibre?style=flat&logo=github)](https://github.com/maplibre/flutter-maplibre)
 [![Pub Downloads](https://img.shields.io/pub/dm/maplibre)](https://pub.dev/packages/maplibre)
