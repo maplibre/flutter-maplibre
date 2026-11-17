@@ -1,3 +1,7 @@
+<div align="center">
+
+<img alt="MapLibre Logo" src="https://maplibre.org/img/maplibre-logos/maplibre-logo-for-light-bg.svg" width="240">
+
 # MapLibre Flutter
 
 [![Pub Version](https://img.shields.io/pub/v/maplibre)](https://pub.dev/packages/maplibre)
@@ -32,6 +36,8 @@ of the MapLibre organization.
   <a href="https://maplibre.org/flutter-maplibre/docs/"><b>Documentation</b></a> ·
   <a href="https://pub.dev/documentation/maplibre/latest/maplibre/"><b>API reference</b></a>
 </p>
+
+</div>
 
 ## Features
 
