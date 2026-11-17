@@ -50,8 +50,10 @@ covers every API change.
   the new `maplibre_geolocator` package connects it to `geolocator`.
 - `MapPlugin` and `MapAlign` let widgets in `children` add layers, callbacks
   and movement limits to the map.
-- Camera: `cameraFor`, `stopCamera`, `roll`, `padding`, flings after pinches
-  and pans, a rotation threshold, and `MapLibreMap.withCamera`.
+- Camera: `cameraFor` fits the camera to bounds or points, `stopCamera`
+  stops an animation, the camera can roll and take padding, pinches and pans
+  keep their momentum after release, a pinch rotates only after a twist
+  threshold, and `MapLibreMap.withCamera` sets the camera from `build`.
 - Sources: clustered GeoJSON, `querySourceFeatures`, image sources from any
   `ImageProvider`, MapLibre Tiles (MLT) and SDF style images.
 - Offline regions of a geometry, such as a route, and `MapLibreNetwork` for
