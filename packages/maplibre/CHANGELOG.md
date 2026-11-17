@@ -1,7 +1,10 @@
 ## 0.4.0-pre.3
 
-The last planned pre-release of 0.4.0 reworks the annotation layers and drops
-the Material dependency of the UI widgets. The
+`maplibre` is now part of the MapLibre organization. Links to the documentation and website 
+have been updated.
+
+This pre-release adds the last breaking changes for v0.4. It reworks the annotation 
+layers and drops the Material dependency of the UI widgets. The
 [migration guide](https://josxha.github.io/flutter-maplibre/docs/migrate/upgrade-from-v0.3.x/)
 covers every change from 0.3.x and from the earlier pre-releases.
 
