@@ -64,6 +64,7 @@ covers every API change.
 
 ### Bug Fixes
 
+- A `StyleController` of a replaced style no longer changes the new style.
 - `SourceAttribution` updates when sources change.
 - Changing a layer in `MapLibreMap.layers` no longer moves it to the top.
 - `MarkerLayer` applies `textOpacity` and `iconTranslate`, and
