@@ -93,7 +93,7 @@ cd examples && flutter drive --driver test_driver/integration_test.dart --target
 cd tool/codegen && dart run ffigen.dart       # after changing the desktop or Darwin C API header
 cd tool/codegen && dart run jnigen.dart       # after changing MaplibreNativeApi.kt; build examples for Android in release first
 cd tool/codegen && dart run style_layers.dart # after raising the style spec version in the script
-pip install zensical && zensical build --clean && python3 .github/scripts/llms_txt.py  # docs site
+pip install zensical pyyaml && zensical build --clean && python3 .github/scripts/llms_txt.py  # docs site
 packages/maplibre_native/linux/test/run_gl_texture_test.sh  # Linux zero-copy check, no Flutter build needed
 ```
 

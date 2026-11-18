@@ -52,7 +52,7 @@ The result should look something like this:
 
 If the map style isn't specified,
 the [default MapLibre style](https://github.com/maplibre/demotiles?tab=readme-ov-file#maplibre-world-demo-map)
-is used. Read the [Styles](../styles) chapter to learn how to use other styles.
+is used. Read the [Styles](../styles.md) chapter to learn how to use other styles.
 
 ## Programmatic Control
 

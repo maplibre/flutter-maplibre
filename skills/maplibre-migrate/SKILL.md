@@ -30,8 +30,9 @@ available as Markdown, listed in https://maplibre.org/flutter-maplibre/llms.txt.
 
 ## 2. Update the dependencies and platforms
 
-- Set `maplibre: ^0.4.0-pre.3` or newer (check pub.dev for the latest
-  version) and remove the old map package. Remove `maplibre_android`,
+- Set the `maplibre` version constraint that
+  https://maplibre.org/flutter-maplibre/docs/getting-started/setup.md names,
+  and remove the old map package. Remove `maplibre_android`,
   `maplibre_ios` and `maplibre_webview` if the app depends on them directly.
 - Apply the platform changes of the guide and of
   https://maplibre.org/flutter-maplibre/docs/getting-started/platforms.md:
@@ -44,9 +45,9 @@ available as Markdown, listed in https://maplibre.org/flutter-maplibre/llms.txt.
 Search the code (`lib/`, `test/`, `integration_test/`) for the old names
 before you edit, and keep the list as a checklist. Starting points:
 
-- `maplibre` 0.3: `initStyle`, `initCenter`, `initZoom`, `setStyle`,
-  `MapGestures.all`, `paint:`, `layout:`, `addLayer`, `addSource`,
-  `featuresAtPoint`, `featuresInRect`, `queryLayers`, `LngLatBounds`,
+- `maplibre` 0.3: the names that "Writing code for 0.4" lists (see step 4), and
+  `initStyle`, `initZoom`, `MapGestures.all`, `paint:`, `layout:`,
+  `addLayer`, `addSource`, `featuresInRect`, `queryLayers`, `LngLatBounds`,
   `onEvent`, `MapEvent…` switches, `fitBounds`, `getVisibleRegion`,
   `MapCamera`, `PermissionManager`, `enableLocation`, `trackLocation`,
   `iconImage`, `PointerInterceptor`, `getCamera()` in `build`.
@@ -67,22 +68,10 @@ the import of each use.
 ## 4. Rewrite the code
 
 Work through the guide section by section, and through your checklist file by
-file. Keep to the shape of the 0.4 API:
-
-- Map options, annotation layers (`CircleLayer`, `MarkerLayer`,
-  `PolylineLayer`, `PolygonLayer`, `WidgetLayer`) and `on…` callbacks are
-  widget parameters. Change them with `setState()` or the app's state
-  management; don't keep annotation objects in a controller.
-- Sources and style layers are added and changed through `style.sources` and
-  `style.layers`, usually in `onStyleLoaded`.
-- Variants are sealed classes with named constructors: `MapStyle.url`,
-  `CameraUpdate.position`, `CameraAnimation.fly`, `QueryGeometry.point`,
-  `GeoJsonData.featureCollection`, `MarkerIcon.asset`.
-- Layer properties and filters take `Expression<T>`, constants
-  `const .literal(…)`.
-- Positions are geobase `Geographic(lon: …, lat: …)`, longitude first;
-  bounds are `GeoBox`. Check the order of every converted coordinate.
-- Queries and camera methods return futures; `await` them.
+file. Keep to the shape of the 0.4 API that the section "Writing code for
+0.4" of https://maplibre.org/flutter-maplibre/docs/getting-started/ai-tools.md
+describes. Check the order of every converted coordinate: geobase takes
+longitude first.
 
 Prefer the replacement the guide names. When the guide has none, look it up
 in the API reference (https://pub.dev/documentation/maplibre/latest/maplibre/)

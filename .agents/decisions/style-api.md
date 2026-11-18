@@ -35,21 +35,19 @@
   know, such as extended CSS names. They read back unchanged.
 - **`StyleLayer` subclasses are generated from the style spec by
   `tool/codegen/style_layers.dart`, and the generated Dart is committed.**
-  Every property is a typed getter, setter and optional constructor parameter,
-  and transitions have typed ones (`colorTransition`). There are no `paint` or
-  `layout` maps and no access by property name: names and JSON stay inside
-  the package, except for `Expression.raw` and `StyleLayer.fromJson`/`toJson`,
-  which also keep what a newer style spec adds. Setters can be synchronous
-  because the state is in Dart, so there are no async `setX` methods.
+  The API of the generated layers is in the [API guidelines](../../website/docs/contributing/api-guidelines.md); transitions
+  have typed properties too (`colorTransition`). Property names and JSON
+  stay inside the package, except for `Expression.raw` and
+  `StyleLayer.fromJson`/`toJson`, which also keep what a newer style spec
+  adds. Setters can be synchronous because the state is in Dart.
   Layers keep only style JSON privately, and
   getters decode it on read, so what a style holds round trips unchanged and
   anything but a literal stays an `Expression.raw`. A literal list goes to the
   map in the plain form of the spec, without `literal`, which every property
   accepts. Colors are written as `#rrggbb`, or `rgba()` when translucent, as
   MapLibre Native's parser doesn't read hex with alpha.
-- **Layer objects are their own controllers, as in the Android and iOS SDKs.**
-  Once a layer is on a map its setters also send the change, fire-and-forget
-  and in order (native: `MapHandle.discarding.setStyleLayerProperty`, which
+- **A layer object on a map sends each change of its setters** (it is its
+  own controller, see the API guidelines), fire-and-forget and in order (native: `MapHandle.discarding.setStyleLayerProperty`, which
   also takes `filter`, `minzoom`, `maxzoom` and `visibility`; web:
   `setPaintProperty`, `setLayoutProperty`, `setFilter`, `setLayerZoomRange`).
   Removing the layer or replacing the style detaches the object.

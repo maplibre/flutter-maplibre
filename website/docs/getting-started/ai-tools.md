@@ -16,10 +16,35 @@ every time the website is built, so they always match the docs.
 |-------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
 | [`llms.txt`](https://maplibre.org/flutter-maplibre/llms.txt)                  | A short summary of the API and an index of every page, with links to their Markdown.       |
 | [`llms-full.txt`](https://maplibre.org/flutter-maplibre/llms-full.txt)        | Every guide, the migration guides and the contributor docs in one file.                   |
-| `<page>.md`                                                                   | The Markdown of a single page: replace the trailing `/` of its URL with `.md`, for example [`docs/map.md`](https://maplibre.org/flutter-maplibre/docs/map.md). |
+| `<page>.md`                                                                   | The Markdown of a single page: replace the trailing `/` of its URL with `.md`, for example [`docs/map.md`](https://maplibre.org/flutter-maplibre/docs/map.md) or [`docs/annotations.md`](https://maplibre.org/flutter-maplibre/docs/annotations.md). |
 
 `llms-full.txt` is large. Assistants that fetch pages on their own work best
 with `llms.txt`, from which they open only the pages they need.
+
+## Writing code for 0.4
+
+What an assistant needs to know before it writes code with `maplibre` 0.4.
+`llms.txt` starts with this section.
+
+- Code written for 0.3 or older doesn't compile with 0.4. Signs of it are
+  `featuresAtPoint`, `MapOptions(initCenter: …)`, `setStyle`, styles passed
+  as strings, and the `maplibre_android`, `maplibre_ios` and
+  `maplibre_webview` packages. The
+  [migration guide](../migrate/upgrade-from-v0.3.x.md) has the replacements.
+- `MapLibreMap` parameters and the annotation layers (`CircleLayer`,
+  `MarkerLayer`, `PolylineLayer`, `PolygonLayer`, `WidgetLayer`) are
+  declarative: change them with `setState()`. Sources and style layers are
+  imperative: add and change them through `style.sources` and
+  `style.layers`, usually in `onStyleLoaded`.
+- Variants are sealed classes with named constructors, such as
+  `MapStyle.url`, `CameraUpdate.position`, `CameraAnimation.fly`,
+  `QueryGeometry.point`, `GeoJsonData.featureCollection` and
+  `MarkerIcon.asset`.
+- Style layer properties and filters take a typed `Expression<T>`; write
+  constants as `const .literal(…)`.
+- Positions are geobase's `Geographic(lon: …, lat: …)`, longitude first, and
+  bounds are `GeoBox`. `maplibre` re-exports them.
+- Feature queries and camera methods return futures; `await` them.
 
 ## Add the docs to your assistant
 
@@ -53,10 +78,6 @@ for assistants that fetch it themselves.
 
 ## Tips
 
-- Name the version you use. Code with `featuresAtPoint`, `initCenter`,
-  `setStyle` or the `maplibre_android` and `maplibre_ios` packages is from 0.3
-  or older; point the assistant to the
-  [migration guide](../migrate/upgrade-from-v0.3.x.md).
 - The [API reference](https://pub.dev/documentation/maplibre/latest/maplibre/)
   on pub.dev has every class and parameter.
 - The [API guidelines](../contributing/api-guidelines.md) explain why the API

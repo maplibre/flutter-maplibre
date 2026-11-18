@@ -5,9 +5,10 @@ Run after `zensical build` from the repository root. It reads the nav of
 `mkdocs.yml` and writes into the built site (`site/` by default):
 
 - `<page>.md`: the Markdown source of each page, with relative links made
-  absolute, next to its HTML page.
-- `llms.txt`: an index of the docs with a link to each Markdown copy, as
-  proposed on https://llmstxt.org.
+  absolute, at the URL of its HTML page with `.md` for the trailing `/`.
+- `llms.txt`: the "Writing code for 0.4" section of the AI tools page and an
+  index of the docs with a link to each Markdown copy, as proposed on
+  https://llmstxt.org.
 - `skills/<name>/SKILL.md`: the agent skills of the repository's `skills/`.
 - `llms-full.txt`: the getting started pages, guides, the current migration
   guides and the contributor docs in one file.
@@ -32,30 +33,10 @@ OPTIONAL_SECTIONS = {"Older versions"}
 OPTIONAL_PAGES = {"compare/index.md"}
 EXCLUDED_PAGES = {"index.md"}
 
-INTRO = """\
-`maplibre` is a Flutter package for interactive vector maps on Android, iOS,
-macOS, Windows, Linux and web. Apps import only `package:maplibre`; it renders
-through Flutter's `Texture` widget on every platform except web, which uses
-MapLibre GL JS.
-
-Notes for writing code with `maplibre` 0.4:
-
-- 0.4 has breaking changes against 0.3 and older. Code that uses
-  `featuresAtPoint`, `MapOptions(initCenter: …)`, `setStyle`, string styles
-  or the `maplibre_android`, `maplibre_ios` or webview packages is outdated;
-  see the migration guide.
-- Annotation layers (`CircleLayer`, `MarkerLayer`, `PolylineLayer`,
-  `PolygonLayer`) and `MapLibreMap` parameters are declarative: change them
-  with `setState()`. Style layers and sources are imperative: add and change
-  them through `StyleController` (`style.layers`, `style.sources`), for
-  example in `onStyleLoaded`.
-- Variants are sealed classes with named constructors: `MapStyle.url`,
-  `CameraUpdate.position`, `CameraAnimation.fly`, `QueryGeometry.point`,
-  `GeoJsonData.featureCollection`, `MarkerIcon.asset` and others.
-- Style layer properties and filters are typed `Expression<T>` values.
-- Geographic types come from `geobase` (`Geographic`, `GeoBox`, `Feature`),
-  re-exported by `maplibre`.
-"""
+# The page and section that llms.txt starts with: what to know before writing
+# code with the current API. It is kept on the docs site, not here.
+INTRO_PAGE = "docs/getting-started/ai-tools.md"
+INTRO_HEADING = "## Writing code for 0.4"
 
 
 @dataclass
@@ -73,15 +54,28 @@ _Loader.add_multi_constructor("tag:yaml.org,2002:python/", lambda *_: None)
 
 
 def _walk(nav: list, section: str, pages: list[Page]) -> None:
+    """Lists the pages of the nav with the title of their innermost section.
+
+    The pages of a section that also has subsections, such as the overview of
+    "Docs", join its first subsection.
+    """
+    waiting: list[Page] = []
     for item in nav:
         if isinstance(item, str):
-            pages.append(Page(item, item, section))
-            continue
+            item = {item: item}
         for title, value in item.items():
             if isinstance(value, list):
+                start = len(pages)
                 _walk(value, title, pages)
+                for page in waiting:
+                    page.section = pages[start].section
+                pages[start:start] = waiting
+                waiting = []
             elif isinstance(value, str) and value.endswith(".md"):
                 pages.append(Page(title, value, section))
+                if any(isinstance(v, list) for i in nav if isinstance(i, dict) for v in i.values()):
+                    waiting.append(pages.pop())
+    pages.extend(waiting)
 
 
 def _split_front_matter(text: str) -> tuple[dict, str]:
@@ -93,40 +87,77 @@ def _split_front_matter(text: str) -> tuple[dict, str]:
     return {}, text
 
 
-_LINK = re.compile(r"(\]\()([^)\s]+)(\))")
+def _md_path(page_path: str) -> str:
+    """The path of a page's Markdown copy: its URL with `.md` for the `/`.
+
+    `docs/map.md` stays `docs/map.md`, and the section page
+    `docs/annotations/index.md` becomes `docs/annotations.md`.
+    """
+    if page_path.endswith("/index.md"):
+        return page_path[: -len("/index.md")] + ".md"
+    return page_path
+
+
+def _html_dir(page_path: str) -> str:
+    """The directory of a page's URL, which raw HTML links resolve against."""
+    if page_path == "index.md":
+        return ""
+    if page_path.endswith("/index.md"):
+        return posixpath.dirname(page_path)
+    return page_path[: -len(".md")]
+
+
+_FENCE = re.compile(r"^(```|~~~).*?^\1", re.M | re.S)
+_MD_LINK = re.compile(r"(\]\()([^)\s]+)(\))")
+_HTML_LINK = re.compile(r"""((?:href|src)=")([^"]+)(")""")
 
 
 def _absolute_links(body: str, page_path: str, site_url: str) -> str:
-    base = posixpath.dirname(page_path)
+    """Makes the relative links of a page absolute, outside of code fences.
 
-    def replace(match: re.Match) -> str:
-        target = match.group(2)
-        if re.match(r"^[a-z][a-z0-9+.-]*:|^#|^/", target):
-            return match.group(0)
-        path, _, anchor = target.partition("#")
-        resolved = posixpath.normpath(posixpath.join(base, path))
-        if path.endswith("/") and not resolved.endswith("/"):
-            resolved += "/"
-        url = site_url + resolved + (f"#{anchor}" if anchor else "")
-        return match.group(1) + url + match.group(3)
+    Markdown links resolve against the Markdown file and point to the
+    Markdown copy of a page, raw HTML links resolve against the page's URL.
+    """
 
-    return _LINK.sub(replace, body)
+    def resolver(base: str, markdown: bool):
+        def replace(match: re.Match) -> str:
+            target = match.group(2)
+            if re.match(r"^[a-z][a-z0-9+.-]*:|^#|^/", target):
+                return match.group(0)
+            path, _, anchor = target.partition("#")
+            resolved = posixpath.normpath(posixpath.join(base, path))
+            if resolved == ".":
+                resolved = ""
+            if markdown and resolved.endswith(".md"):
+                resolved = _md_path(resolved)
+            elif path.endswith("/") and resolved:
+                resolved += "/"
+            url = site_url + resolved + (f"#{anchor}" if anchor else "")
+            return match.group(1) + url + match.group(3)
+
+        return replace
+
+    md = resolver(posixpath.dirname(page_path), markdown=True)
+    html = resolver(_html_dir(page_path), markdown=False)
+    parts, last = [], 0
+    for fence in _FENCE.finditer(body):
+        text = body[last : fence.start()]
+        parts += [_HTML_LINK.sub(html, _MD_LINK.sub(md, text)), fence.group(0)]
+        last = fence.end()
+    text = body[last:]
+    parts.append(_HTML_LINK.sub(html, _MD_LINK.sub(md, text)))
+    return "".join(parts)
 
 
-def _description(meta: dict, body: str) -> str:
-    """The front matter description, or else the first paragraph of prose."""
-    if meta.get("description"):
-        return str(meta["description"])
-    prose = re.sub(r"^```.*?^```", "", body, flags=re.M | re.S)
-    for paragraph in re.split(r"\n\s*\n", prose):
-        if not paragraph.strip() or paragraph[0].isspace():
-            continue  # empty, or the body of an admonition or a tab
-        if paragraph[0] in "#!|<-*>[=" or paragraph.startswith("???"):
-            continue  # heading, admonition, table, HTML, list or image
-        text = " ".join(paragraph.split())
-        text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
-        return text if len(text) <= 200 else text[:197].rsplit(" ", 1)[0] + "…"
-    return ""
+def _section(body: str, heading: str) -> str:
+    """The text below a `## ` heading, up to the next one."""
+    start = body.index(heading + "\n") + len(heading) + 1
+    end = body.find("\n## ", start)
+    return body[start : end if end != -1 else None].strip()
+
+
+def _description(meta: dict) -> str:
+    return str(meta.get("description", ""))
 
 
 def main() -> None:
@@ -138,22 +169,28 @@ def main() -> None:
     pages: list[Page] = []
     _walk(config["nav"], "", pages)
 
-    index = [f"# {config['site_name']}", "", f"> {config['site_description']}", "", INTRO]
-    full = [f"# {config['site_name']}", "", f"> {config['site_description']}", "", INTRO]
+    _, intro_body = _split_front_matter((docs_dir / INTRO_PAGE).read_text())
+    intro = _absolute_links(_section(intro_body, INTRO_HEADING), INTRO_PAGE, site_url)
+    header = [f"# {config['site_name']}", "", f"> {config['site_description']}", ""]
+    index = [*header, INTRO_HEADING, "", intro, ""]
+    full = list(header)
     sections: dict[str, list[str]] = {}
     optional: list[str] = []
+    written = 0
 
     for page in pages:
         if page.path in EXCLUDED_PAGES:
             continue
         meta, body = _split_front_matter((docs_dir / page.path).read_text())
         body = _absolute_links(body, page.path, site_url)
-        out = site_dir / page.path
+        md_path = _md_path(page.path)
+        out = site_dir / md_path
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(body)
+        written += 1
 
-        url = site_url + page.path
-        description = _description(meta, body)
+        url = site_url + md_path
+        description = _description(meta)
         entry = f"- [{page.title}]({url})" + (f": {description}" if description else "")
         if page.section in OPTIONAL_SECTIONS or page.path in OPTIONAL_PAGES:
             optional.append(entry)
@@ -192,7 +229,7 @@ def main() -> None:
 
     (site_dir / "llms.txt").write_text("\n".join(index))
     (site_dir / "llms-full.txt").write_text("\n".join(full) + "\n")
-    print(f"Wrote llms.txt and llms-full.txt for {len(pages)} pages to {site_dir}")
+    print(f"Wrote llms.txt and llms-full.txt for {written} pages to {site_dir}")
 
 
 if __name__ == "__main__":

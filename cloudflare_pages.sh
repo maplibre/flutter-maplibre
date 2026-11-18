@@ -2,7 +2,7 @@
 set -euo pipefail
 
 echo "▶ Building website"
-pip install zensical
+pip install zensical pyyaml
 zensical build --clean
 python3 .github/scripts/llms_txt.py
 

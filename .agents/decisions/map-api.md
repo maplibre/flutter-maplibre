@@ -11,12 +11,12 @@
   URL transform is a Dart callback, set on native only while there is one,
   as each request then waits for Dart. Resource providers and the network
   status are not exposed yet.
-- **Events are one `on…` callback per event on `MapLibreMap`, not one
-  `onEvent` with a type switch.** A null callback is unsubscribed: native
-  maps leave it out of the event mask, web maps don't listen to `render`,
-  and the gesture detector registers no recognizer for it. A new event is a
-  new optional parameter, while a new subclass of a sealed event passed to
-  one callback broke every exhaustive switch. The events follow the ffi and
+- **Events follow the "Events" rules of the [API guidelines](../../website/docs/contributing/api-guidelines.md).** The
+  former `onEvent` took a sealed event, so every new event broke the
+  exhaustive switches of apps. An unsubscribed callback costs nothing:
+  native maps leave it out of the event mask, web maps don't listen to
+  `render`, and the gesture detector registers no recognizer for it. The
+  events follow the ffi and
   gl-js events; per-axis camera events (gl-js `zoomstart`, `rotate` …), raw
   pointer events, box zoom, `styledata` and `dataabort` are left out on
   purpose, and offline events stay on `OfflineManager`.
@@ -49,9 +49,8 @@
   model, after the frame when they come while the tree builds (annotation
   layers change there). Only the model rebuilds for them (a
   `ValueListenableBuilder` around it), not the platform widget.
-- **`MapOptions.style` is a sealed `MapStyle` and declarative; there is no
-  `setStyle`.** Backends switch on the type instead of guessing from the
-  string, and a changed `style` loads the new style.
+- **`MapOptions.style` is a sealed `MapStyle`** (see the API guidelines).
+  Backends switch on the type instead of guessing from the string.
 - **One sealed `CameraUpdate` (position, bounds, points, geometry) for
   `MapOptions.initCamera`, `moveCamera`, `animateCamera` and `cameraFor`;
   one sealed `CameraAnimation` (ease, fly) for how.** Both platforms have
