@@ -191,8 +191,7 @@ class StyleControllerWeb extends StyleController implements StyleBackend {
 
   @override
   List<String> get attributions {
-    // Read only the attribution of each source: the style holds the data of
-    // GeoJSON sources, whose conversion to Dart takes up to seconds (#694).
+    // Convert only what is needed: the style sources can hold large data.
     final styleSources = _map.getStyle()?.sources;
     if (styleSources == null) return const [];
     final ids = (globalContext['Object']! as JSObject)
