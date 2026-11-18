@@ -66,8 +66,10 @@ Flutter MapLibre: a federated plugin in a Dart pub workspace.
   demo are relative (`demo/`, `../../demo/`), because the site lives under a
   subpath there.
 - `.github/scripts/llms_txt.py`: run after `zensical build`; writes
-  `llms.txt`, `llms-full.txt` and a Markdown copy of every page from the
-  `mkdocs.yml` nav into `site/`.
+  `llms.txt`, `llms-full.txt`, a Markdown copy of every page from the
+  `mkdocs.yml` nav and the skills of `skills/` into `site/`.
+- `skills/`: agent skills for app developers (`maplibre-migrate`), linked
+  from the migration guides. Keep them in step with the guides they read.
 - `.github/scripts/watchdog.sh`: stops a CI test run once its output stalls
   and reports the last test, the app's stacks and its log as annotations;
   exits with 75 when flutter test never attached to the app, so CI retries.
