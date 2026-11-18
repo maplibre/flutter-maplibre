@@ -114,17 +114,23 @@ class StyleControllerNative extends StyleController implements StyleBackend {
       _emptyImage,
     );
     // Whether the source is still on the map: it may have been removed or
-    // replaced meanwhile. Moving its corners keeps the image.
-    bool current() => switch ((source, sources[source.id])) {
-      (ImageSourceBytes(:final bytes), ImageSourceBytes(bytes: final now)) =>
-        identical(bytes, now),
-      (
-        ImageSourceProvider(:final image),
-        ImageSourceProvider(image: final now),
-      ) =>
-        identical(image, now),
-      _ => false,
-    };
+    // replaced meanwhile, and a new style on the map takes the image of
+    // this one nowhere. Moving its corners keeps the image.
+    bool current() =>
+        !_replaced &&
+        switch ((source, sources[source.id])) {
+          (
+            ImageSourceBytes(:final bytes),
+            ImageSourceBytes(bytes: final now),
+          ) =>
+            identical(bytes, now),
+          (
+            ImageSourceProvider(:final image),
+            ImageSourceProvider(image: final now),
+          ) =>
+            identical(image, now),
+          _ => false,
+        };
     await added;
     final mln.PremultipliedRgba8Image pixels;
     try {

@@ -345,11 +345,14 @@ class StyleControllerWeb extends StyleController implements StyleBackend {
   /// the image of its provider.
   Future<void> _loadProviderImage(ImageSourceProvider source) async {
     // Whether the source is still on the map: it may have been removed or
-    // replaced meanwhile. Moving its corners keeps the image.
-    bool current() => switch (sources[source.id]) {
-      ImageSourceProvider(:final image) => identical(image, source.image),
-      _ => false,
-    };
+    // replaced meanwhile, and a new style on the map takes the image of
+    // this one nowhere. Moving its corners keeps the image.
+    bool current() =>
+        !_replaced &&
+        switch (sources[source.id]) {
+          ImageSourceProvider(:final image) => identical(image, source.image),
+          _ => false,
+        };
     final String blobUrl;
     try {
       blobUrl = await _blobUrlOfProvider(source.image);
