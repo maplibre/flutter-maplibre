@@ -1,6 +1,7 @@
 ---
 title: 'First map'
 icon: lucide/gamepad-2
+description: 'Show a first map with MapLibreMap and control it with the MapController.'
 ---
 
 # First map

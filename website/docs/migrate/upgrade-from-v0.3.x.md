@@ -1,6 +1,7 @@
 ---
 title: 'Upgrade to 0.4'
 icon: lucide/arrow-up-right
+description: 'Every breaking change of 0.4 and how to update code written for 0.3.'
 ---
 
 # Upgrade from 0.3.x to 0.4

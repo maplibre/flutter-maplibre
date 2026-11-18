@@ -65,6 +65,9 @@ Flutter MapLibre: a federated plugin in a Dart pub workspace.
   the demo and deploys both to GitHub Pages. Links from the website to the
   demo are relative (`demo/`, `../../demo/`), because the site lives under a
   subpath there.
+- `.github/scripts/llms_txt.py`: run after `zensical build`; writes
+  `llms.txt`, `llms-full.txt` and a Markdown copy of every page from the
+  `mkdocs.yml` nav into `site/`.
 - `.github/scripts/watchdog.sh`: stops a CI test run once its output stalls
   and reports the last test, the app's stacks and its log as annotations;
   exits with 75 when flutter test never attached to the app, so CI retries.
@@ -108,14 +111,11 @@ build root of a maplibre-native-ffi clone in
 - Never use method channels. Dart calls native code through ffigen (C/C++)
   or jnigen (Kotlin/Java) bindings.
 - Note API gaps of `maplibre_native_ffi` in `.agents/decisions.md`.
-- Convert between this plugin's types and a platform's types (`mln.*`,
-  gl-js interop) with extension methods in the platform package's
-  `lib/src/extensions.dart`, not with static or top-level helpers or members
-  of interop types. Name an extension `<Type>Ext`, or `Mln<Type>Ext` and
-  `Js<Type>Ext` on platform types; convert with `toMln()` or `toJs()` and back
-  with `to<Type>()`.
-- In docs and messages, name platforms ("only on web", "not on web", or a
-  list), never the engine behind them, such as MapLibre Native.
+- Follow the API guidelines in `website/docs/contributing/api-guidelines.md`
+  for public API, docs and platform conversions: declarative widgets and an
+  imperative style, sealed types, layer controllers, conversions as
+  extensions in `lib/src/extensions.dart`, and naming platforms instead of
+  engines. Update that page when a rule changes; don't repeat its rules here.
 - Never edit `*.g.dart` by hand. Change the generator in `tool/codegen/`.
 - Use conventional commits (`feat(native): …`, `fix: …`, `ci: …`).
 - Read `.agents/decisions.md` before changing rendering, threading, or the

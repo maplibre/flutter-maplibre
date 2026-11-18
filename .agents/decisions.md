@@ -856,6 +856,12 @@ Each entry: the decision, then why.
   there but stays unused.
 - **CI builds and tests against the published C library.** No job builds it
   from source.
+- **`llms.txt` and `llms-full.txt` are generated after the site build, from
+  the `mkdocs.yml` nav (`.github/scripts/llms_txt.py`), not kept in the
+  repository.** Zensical has no plugin for them, and generated files can't
+  fall behind the pages. Links become absolute URLs of the Markdown copies
+  next to each page; old migration guides and Compare are only listed, and
+  the landing page is left out.
 - **CI has no build-only jobs for platforms the integration tests run on.**
   Each integration test job builds the example app for its platform. Only
   the web wasm build has its own job, as the tests run the JavaScript build.

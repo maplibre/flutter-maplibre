@@ -29,6 +29,7 @@ jobs:
           python-version: 3.x
       - run: pip install zensical
       - run: zensical build --clean
+      - run: python .github/scripts/llms_txt.py
       - uses: actions/configure-pages@v5
         if: env.DEPLOY == 'true'
         id: pages
