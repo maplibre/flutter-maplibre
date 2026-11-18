@@ -8,6 +8,7 @@ Run after `zensical build` from the repository root. It reads the nav of
   absolute, next to its HTML page.
 - `llms.txt`: an index of the docs with a link to each Markdown copy, as
   proposed on https://llmstxt.org.
+- `skills/<name>/SKILL.md`: the agent skills of the repository's `skills/`.
 - `llms-full.txt`: the getting started pages, guides, the current migration
   guides and the contributor docs in one file.
 """
@@ -160,6 +161,16 @@ def main() -> None:
         sections.setdefault(page.section or "More", []).append(entry)
         full += ["", "---", "", f"Source: {url}", "", body.rstrip()]
 
+    # Agent skills of the repository, served next to the docs.
+    skills = []
+    for skill in sorted((ROOT / "skills").glob("*/SKILL.md")):
+        meta, _ = _split_front_matter(skill.read_text())
+        out = site_dir / "skills" / skill.parent.name / "SKILL.md"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(skill.read_text())
+        url = f"{site_url}skills/{skill.parent.name}/SKILL.md"
+        skills.append(f"- [{meta['name']}]({url}): {meta['description']}")
+
     for section, entries in sections.items():
         index += [f"## {section}", "", *entries, ""]
     index += [
@@ -168,6 +179,10 @@ def main() -> None:
         "- [maplibre on pub.dev](https://pub.dev/documentation/maplibre/latest/maplibre/):"
         " the dartdoc of every public class and member.",
         f"- [llms-full.txt]({site_url}llms-full.txt): every page above in one file.",
+        "",
+        "## Skills",
+        "",
+        *skills,
         "",
         "## Optional",
         "",

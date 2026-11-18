@@ -36,6 +36,21 @@ older versions and from maplibre_gl.
 Assistants with a docs index, such as Cursor's `@Docs`, can also index
 `https://maplibre.org/flutter-maplibre/llms-full.txt` directly.
 
+## Migration skill
+
+The [`maplibre-migrate`](https://github.com/maplibre/flutter-maplibre/tree/main/skills/maplibre-migrate)
+skill moves an app to `maplibre` 0.4: from 0.3 or older, `maplibre_gl`,
+`flutter_map`, `google_maps_flutter` or `mapbox_maps_flutter`. It tells the
+assistant which [migration guide](../migrate/upgrade-from-v0.3.x.md) to read,
+what to search for, and to run `dart analyze` until the code is clean.
+
+It follows the [Agent Skills](https://agentskills.io) format. Copy the
+`maplibre-migrate` folder into the skills folder of your assistant, for
+example `.claude/skills/` of your project for Claude Code, and ask it to
+migrate the app. The skill is also served at
+[`skills/maplibre-migrate/SKILL.md`](https://maplibre.org/flutter-maplibre/skills/maplibre-migrate/SKILL.md)
+for assistants that fetch it themselves.
+
 ## Tips
 
 - Name the version you use. Code with `featuresAtPoint`, `initCenter`,
