@@ -9,9 +9,10 @@ icon: lucide/ruler
 These rules shape the public API of `maplibre` and
 `maplibre_platform_interface`. They explain why the API looks the way it does,
 so that new features fit in, and they help plugin authors write packages that
-feel like part of `maplibre`. The reasoning behind single decisions is
+feel like part of `maplibre`. The reasons behind single features are
 recorded in
-[`.agents/decisions.md`](https://github.com/maplibre/flutter-maplibre/blob/main/.agents/decisions.md).
+[`.agents/decisions/`](https://github.com/maplibre/flutter-maplibre/tree/main/.agents/decisions),
+one file per area.
 
 If a change needs to break one of these rules, discuss it in an issue first.
 
