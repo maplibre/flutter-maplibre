@@ -310,6 +310,30 @@ void runTests() {
       expect(left.getCamera().zoom, closeTo(6, 1e-6));
       expect(right.getCamera().zoom, closeTo(4, 1e-6));
     });
+
+    testWidgets('captures the map it shows', (tester) async {
+      final map = await pumpMap(tester);
+      await map.waitForLatestFrame();
+      // The widget over the map must not reach the capture.
+      final png = await map.controller.takeSnapshot(pixelRatio: 1);
+      expect(png, isNotNull);
+
+      final image = await decodeImageFromList(png!);
+      addTearDown(image.dispose);
+      // toImage rounds the size up to the next whole pixel.
+      expect(image.width, map.size.width.ceil());
+      expect(image.height, map.size.height.ceil());
+
+      final pixels = await image.toByteData();
+      final middle = ((image.height ~/ 2) * image.width + image.width ~/ 2) * 4;
+      // The background of the test style, which only the map draws.
+      expect(Uint8List.sublistView(pixels!, middle, middle + 4), [
+        0xdd,
+        0xdd,
+        0xdd,
+        0xff,
+      ]);
+    }, skip: kIsWeb);
   });
 }
 

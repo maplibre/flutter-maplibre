@@ -332,6 +332,13 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
   }
 
   @override
+  Future<Uint8List?> takeSnapshot({double? pixelRatio}) async =>
+      throw UnsupportedError(
+        'takeSnapshot is not supported on the web: the map draws in an HTML '
+        'canvas whose drawing buffer MapLibre GL JS clears after each frame.',
+      );
+
+  @override
   Widget buildPlatformWidget(BuildContext context) => Listener(
     behavior: HitTestBehavior.opaque,
     onPointerDown: _onPointerDown,
