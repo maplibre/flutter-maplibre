@@ -191,16 +191,20 @@ class StyleControllerWeb extends StyleController implements StyleBackend {
 
   @override
   List<String> get attributions {
-    final sources =
-        _map.getStyle()?.sources.dartify() as Map<Object?, Object?>?;
-    if (sources == null) return const [];
+    // Read only the attribution of each source: the style holds the data of
+    // GeoJSON sources, whose conversion to Dart takes up to seconds (#694).
+    final styleSources = _map.getStyle()?.sources;
+    if (styleSources == null) return const [];
+    final ids = (globalContext['Object']! as JSObject)
+        .callMethod<JSArray<JSString>>('keys'.toJS, styleSources)
+        .toDart;
     final attributions = <String>[];
-    for (final MapEntry(:key, :value) in sources.entries) {
+    for (final id in ids) {
       // The source object has the attribution of a loaded TileJSON, the
       // style only the one of the source options.
       final attribution =
-          _map.getSource(key! as String)?['attribution'].dartify() ??
-          (value! as Map<Object?, Object?>)['attribution'];
+          _map.getSource(id.toDart)?['attribution'].dartify() ??
+          (styleSources[id.toDart] as JSObject?)?['attribution'].dartify();
       if (attribution == null) continue;
       if (attribution is String && attribution.isEmpty) continue;
       attributions.add(attribution.toString());
