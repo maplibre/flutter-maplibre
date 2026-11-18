@@ -382,7 +382,7 @@ class StyleControllerWeb extends StyleController implements StyleBackend {
       final context =
           canvas.getContext('2d')! as OffscreenCanvasRenderingContext2D;
       context.putImageData(
-        ImageData(data.buffer.asUint8ClampedList().toJS, image.width),
+        ImageData(Uint8ClampedList.sublistView(data).toJS, image.width),
         0,
         0,
       );
