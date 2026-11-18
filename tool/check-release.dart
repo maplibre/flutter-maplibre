@@ -61,9 +61,9 @@ void main(List<String> arguments) {
 
   final expectedConstraint = '^$versionString';
 
-  final packages = _collectPackages(Directory('packages'))
-      .where((package) => !_pluginPackages.contains(package.name))
-      .toList();
+  final packages = _collectPackages(
+    Directory('packages'),
+  ).where((package) => !_pluginPackages.contains(package.name)).toList();
   final packageNames = packages.map((package) => package.name).toSet();
 
   for (final package in packages) {
@@ -115,9 +115,9 @@ void main(List<String> arguments) {
 /// Checks the version and changelog of a plugin package, which is released
 /// on its own and writes the package directory to the GitHub output.
 void _checkPlugin(String name, String version) {
-  final package = _collectPackages(Directory('packages'))
-      .where((package) => package.name == name)
-      .firstOrNull;
+  final package = _collectPackages(
+    Directory('packages'),
+  ).where((package) => package.name == name).firstOrNull;
   if (package == null) {
     _fail('Missing package $name under packages');
   }
