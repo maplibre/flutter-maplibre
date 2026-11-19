@@ -9,8 +9,10 @@
   wins) because the C API runs header callbacks synchronously on a library
   thread, which Dart can't answer; web matches the same globs in Dart. The
   URL transform is a Dart callback, set on native only while there is one,
-  as each request then waits for Dart. Resource providers and the network
-  status are not exposed yet.
+  as each request then waits for Dart. `offline` is the C library's network
+  status, which is process-wide: each engine sets it only when its own value
+  changes, so the default of a second engine doesn't undo the first; not on
+  web, as gl-js has no equivalent. Resource providers are not exposed yet.
 - **Events follow the "Events" rules of the [API guidelines](../../website/docs/contributing/api-guidelines.md).** The
   former `onEvent` took a sealed event, so every new event broke the
   exhaustive switches of apps. An unsubscribed callback costs nothing:

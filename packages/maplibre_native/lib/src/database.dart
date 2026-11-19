@@ -39,6 +39,7 @@ Future<RuntimeHandle> createRuntime() async {
   final path = await databasePath();
   // Android needs the C library initialized before its first use.
   if (Platform.isAndroid) AndroidPlugin.initialize();
+  _applyNetworkStatus();
   final runtime = RuntimeHandle.create(
     options: RuntimeOptions(cachePath: path),
   );
@@ -67,6 +68,8 @@ final _runtimes = <RuntimeHandle>{};
 var _listensToNetwork = false;
 
 void _onNetworkChanged() {
+  // The C library is initialized, as a runtime was created before.
+  _applyNetworkStatus();
   _runtimes.removeWhere((runtime) => runtime.isClosed);
   for (final runtime in _runtimes) {
     unawaited(
@@ -87,6 +90,20 @@ void _onNetworkChanged() {
       }),
     );
   }
+}
+
+/// The [MapLibreNetwork.offline] that this engine last set. The library
+/// starts online.
+var _offline = false;
+
+/// Sets [MapLibreNetwork.offline] as the network status of the C library,
+/// which applies to every runtime of the process. Only a change is set, so
+/// the default of one engine doesn't undo the setting of another.
+void _applyNetworkStatus() {
+  final offline = MapLibreNetwork.offline;
+  if (offline == _offline) return;
+  setNetworkStatus(offline ? NetworkStatus.offline : NetworkStatus.online);
+  _offline = offline;
 }
 
 /// Sets the headers and URL transform of [MapLibreNetwork] on [runtime].
