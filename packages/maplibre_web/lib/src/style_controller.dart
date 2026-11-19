@@ -32,6 +32,8 @@ class StyleControllerWeb extends StyleController implements StyleBackend {
     _replacedByNewer = true;
     layers.markReplaced();
     sources.markReplaced();
+    light.markReplaced();
+    globalState.markReplaced();
   }
 
   /// Sets gl-js's fade duration, which the map reads on every frame: 0 shows
@@ -48,6 +50,22 @@ class StyleControllerWeb extends StyleController implements StyleBackend {
   @override
   late final StyleLayers layers = StyleLayers(this, sources: sources);
 
+  @override
+  late final StyleLight light = StyleLight(this);
+
+  @override
+  late final StyleGlobalState globalState = StyleGlobalState(this);
+
+  @override
+  StyleTransition get transition => _transition;
+  var _transition = const StyleTransition();
+
+  @override
+  set transition(StyleTransition value) {
+    _transition = value;
+    if (!_replaced) setTransition(value);
+  }
+
   /// Fills [layers] and [sources] from the style that the map loaded.
   void load() {
     final style = _map.getStyle();
@@ -58,6 +76,11 @@ class StyleControllerWeb extends StyleController implements StyleBackend {
     }
     if (json case {'layers': final List<Object?> styleLayers}) {
       layers.load(styleLayers.whereType<Map<String, Object?>>());
+    }
+    light.load(json['light']);
+    globalState.load(json['state']);
+    if (json['transition'] case final Map<String, Object?> transition) {
+      _transition = StyleTransition.fromJson(transition);
     }
     _attributions = attributions;
   }
@@ -215,6 +238,54 @@ class StyleControllerWeb extends StyleController implements StyleBackend {
     String url,
     Map<String, Object?> specification,
   ) async => _map.getSource(id)!.setUrl(url);
+
+  @override
+  void setFeatureState(FeatureRef feature, Map<String, Object?> state) =>
+      _map.setFeatureState(
+        _featureTarget(feature.sourceId, feature.sourceLayer, feature.id),
+        state.jsify()!,
+      );
+
+  @override
+  void removeFeatureState(
+    String sourceId, {
+    String? sourceLayer,
+    Object? id,
+    String? key,
+  }) {
+    final target = _featureTarget(sourceId, sourceLayer, id);
+    // gl-js counts an undefined key as given.
+    key == null
+        ? _map.removeFeatureState(target)
+        : _map.removeFeatureState(target, key);
+  }
+
+  /// The feature identifier of gl-js, without the members that are null.
+  static JSObject _featureTarget(
+    String sourceId,
+    String? sourceLayer,
+    Object? id,
+  ) =>
+      {'source': sourceId, 'sourceLayer': ?sourceLayer, 'id': ?id}.jsify()!
+          as JSObject;
+
+  @override
+  void setGlobalStateProperty(String name, Object? value) =>
+      _map.setGlobalStateProperty(name, value.jsify());
+
+  @override
+  void setLight(Map<String, Object?> json) => _map.setLight(json.jsify()!);
+
+  /// Writes the transition into the stylesheet of gl-js's style, which it
+  /// reads on every frame: gl-js has no setter, and a style diff ignores
+  /// changes to it.
+  @override
+  void setTransition(StyleTransition transition) {
+    final stylesheet = _map.styleObject?.getProperty<JSObject?>(
+      'stylesheet'.toJS,
+    );
+    stylesheet?.setProperty('transition'.toJS, transition.toJson().jsify());
+  }
 
   List<String> _attributions = const [];
 

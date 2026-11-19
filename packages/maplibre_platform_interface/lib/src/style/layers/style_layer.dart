@@ -6,6 +6,8 @@ import 'package:maplibre_platform_interface/src/style/style_owner.dart';
 
 part 'style_layer_collection.dart';
 part 'style_layers.g.dart';
+part 'style_light.dart';
+part 'style_light.g.dart';
 
 /// A layer of a map style.
 ///
@@ -270,7 +272,7 @@ abstract class StyleLayer {
 
   StyleTransition? _transition(String name) =>
       switch (_paint['$name-transition']) {
-        final Map<String, Object?> json => StyleTransition._fromJson(json),
+        final Map<String, Object?> json => StyleTransition.fromJson(json),
         _ => null,
       };
 
@@ -373,7 +375,8 @@ final class StyleTransition {
     this.delay = Duration.zero,
   });
 
-  factory StyleTransition._fromJson(Map<String, Object?> json) =>
+  /// Reads a transition from its style JSON.
+  factory StyleTransition.fromJson(Map<String, Object?> json) =>
       StyleTransition(
         duration: Duration(
           milliseconds: (json['duration'] as num?)?.toInt() ?? 300,

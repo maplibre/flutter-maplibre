@@ -40,6 +40,12 @@ final class StyleSources extends Iterable<Source> implements Listenable {
   /// TileJSON resource added: an update must not carry that over.
   final _specifications = <String, Map<String, Object?>>{};
 
+  /// The feature state that was set, by source id, source layer (empty for
+  /// sources without layers) and feature id. The map keeps nothing else, so
+  /// this is all of it.
+  final _featureStates =
+      <String, Map<String, Map<Object, Map<String, Object?>>>>{};
+
   var _replaced = false;
   var _warnedReplaced = false;
 
@@ -124,6 +130,8 @@ final class StyleSources extends Iterable<Source> implements Listenable {
     }
     _sources.remove(id);
     _specifications.remove(id);
+    // The map drops the feature state with the source.
+    _featureStates.remove(id);
     _changes.value++;
     await _backend.removeSource(id);
   }
@@ -201,6 +209,125 @@ final class StyleSources extends Iterable<Source> implements Listenable {
     await _backend.setTileJsonUrl(id, url, specification);
   }
 
+  /// Merges [state] into the feature state of [feature]: its keys replace the
+  /// same keys of the feature, and the other keys stay.
+  ///
+  /// Layers read feature state with the `feature-state` expression
+  /// ([Expression.featureState]) in their paint properties, so a change
+  /// shows on the next frame without touching the data of the source. Use it
+  /// for states such as hover or selection.
+  ///
+  /// The change reaches the map without waiting, in order with other changes.
+  /// The state stays while the source is on the map, also when its data
+  /// changes, and goes with the source or the style.
+  ///
+  /// Only GeoJSON and vector sources have feature state. Fails with an
+  /// [ArgumentError] if the style has no such source, or if [feature] has no
+  /// [FeatureRef.sourceLayer] on a vector source or has one on another
+  /// source.
+  void setFeatureState(FeatureRef feature, Map<String, Object?> state) {
+    if (_detachedOrWarn()) return;
+    final sourceLayer = _featureStateLayer(
+      feature.sourceId,
+      feature.sourceLayer,
+    );
+    final features = _featureStates
+        .putIfAbsent(feature.sourceId, () => {})
+        .putIfAbsent(sourceLayer, () => {});
+    final current = features[feature.id] ?? const {};
+    features[feature.id] = Map.unmodifiable({...current, ...state});
+    _backend.setFeatureState(feature, state);
+  }
+
+  /// The feature state of [feature], as [setFeatureState] set it, or an empty
+  /// map if it has none.
+  ///
+  /// Fails like [setFeatureState] for an unknown source or a wrong
+  /// [FeatureRef.sourceLayer].
+  Map<String, Object?> featureState(FeatureRef feature) {
+    final sourceLayer = _featureStateLayer(
+      feature.sourceId,
+      feature.sourceLayer,
+    );
+    return _featureStates[feature.sourceId]?[sourceLayer]?[feature.id] ??
+        const {};
+  }
+
+  /// Removes the key [key] from the feature state of [feature], or all of its
+  /// state if [key] is null.
+  ///
+  /// Fails like [setFeatureState] for an unknown source or a wrong
+  /// [FeatureRef.sourceLayer].
+  void removeFeatureState(FeatureRef feature, {String? key}) {
+    if (_detachedOrWarn()) return;
+    final sourceLayer = _featureStateLayer(
+      feature.sourceId,
+      feature.sourceLayer,
+    );
+    final features = _featureStates[feature.sourceId]?[sourceLayer];
+    if (features != null) {
+      if (key == null) {
+        features.remove(feature.id);
+      } else if (features[feature.id] case final current?) {
+        features[feature.id] = Map.unmodifiable({...current}..remove(key));
+      }
+    }
+    _backend.removeFeatureState(
+      feature.sourceId,
+      sourceLayer: feature.sourceLayer,
+      id: feature.id,
+      key: key,
+    );
+  }
+
+  /// Removes the feature state of every feature of the source [sourceId], in
+  /// the layer [sourceLayer] of a vector source.
+  ///
+  /// Fails with an [ArgumentError] if the style has no such source, or if
+  /// [sourceLayer] is null for a vector source or set for another source.
+  void clearFeatureState(String sourceId, {String? sourceLayer}) {
+    if (_detachedOrWarn()) return;
+    final layer = _featureStateLayer(sourceId, sourceLayer);
+    _featureStates[sourceId]?.remove(layer);
+    _backend.removeFeatureState(sourceId, sourceLayer: sourceLayer);
+  }
+
+  /// The key of [sourceLayer] in [_featureStates], after checking that the
+  /// source [sourceId] has feature state in it.
+  String _featureStateLayer(String sourceId, String? sourceLayer) {
+    final source = _sources[sourceId];
+    switch (source) {
+      case null:
+        throw ArgumentError.value(
+          sourceId,
+          'sourceId',
+          'The style has no such source',
+        );
+      case VectorSource() when sourceLayer == null:
+        throw ArgumentError.value(
+          sourceLayer,
+          'sourceLayer',
+          'A vector source needs the source layer of the feature',
+        );
+      case VectorSource():
+        return sourceLayer!;
+      case GeoJsonSource() when sourceLayer != null:
+        throw ArgumentError.value(
+          sourceLayer,
+          'sourceLayer',
+          'A GeoJSON source has no source layers',
+        );
+      case GeoJsonSource():
+        return '';
+      default:
+        throw ArgumentError.value(
+          sourceId,
+          'sourceId',
+          'Only GeoJSON and vector sources have feature state',
+        );
+    }
+  }
+
   /// Fills the collection with the sources of a loaded style, by the `sources`
   /// member of its JSON. Platforms call it.
   void load(Map<String, Object?> sources) {
@@ -250,6 +377,7 @@ final class StyleSources extends Iterable<Source> implements Listenable {
   void dispose() {
     _sources.clear();
     _specifications.clear();
+    _featureStates.clear();
     _changes.value++;
   }
 

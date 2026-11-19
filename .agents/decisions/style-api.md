@@ -92,3 +92,28 @@
   fades over the style's transition duration, web over the map's 300 ms,
   which gl-js also times pattern and dash crossfades with, so off ends those
   too on web.
+- **Feature state is set on `StyleSources` with a `FeatureRef`, fire-and-forget,
+  and read back synchronously from a cache in Dart.** It belongs to a source
+  and goes with it, so it is imperative like the source and not a widget
+  parameter, and hover changes it on every pointer move. The map keeps no
+  feature state that the app didn't set, so the cache (merged per feature,
+  dropped with the source and the style) is the whole state; reading it from
+  the C API would be async. `clearFeatureState` is its own method because
+  removing a key needs a feature id. The collection checks the source and the
+  source layer (vector sources need one, GeoJSON takes none), as gl-js
+  rejects either with an error event. On web, GeoJSON ids must be
+  non-negative integers; native takes any id (`FeatureIdUintValue` and
+  friends).
+- **The light is a generated `StyleLight`, its own controller like a style
+  layer, on `StyleController.light`.** It is part of the style document, so
+  it is read from the style JSON on load and resets with a new style. Every
+  change sends the whole light (native `setStyleLightJson`, gl-js
+  `setLight`), as gl-js has no per-property setter.
+- **`StyleController.transition` is the style's default transition, a
+  `StyleTransition` read from the style JSON.** Native sets
+  `StyleTransitionOptions` with `enablePlacementTransitions` null, which
+  keeps what `setPlacementTransitions` set. gl-js has no setter (a style
+  diff ignores `transition`), but reads `style.stylesheet.transition` on
+  every evaluation, so web writes that object; the integration test fails if
+  gl-js stops reading it. `setPlacementTransitions` stays a method of its
+  own, as folding it in would break the 0.4 API.
