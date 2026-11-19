@@ -439,7 +439,7 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
     if (options.style != oldWidget.options.style) {
       _setStyle(options.style);
     } else if (options.globalState != oldWidget.options.globalState) {
-      style?.globalState.apply(options.globalState);
+      style?.applyGlobalState(options.globalState);
     }
     super.didUpdateWidget(oldWidget);
   }
@@ -866,9 +866,10 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
   }
 
   void _onStyleLoaded() {
-    style?.dispose();
-    final styleCtrl = StyleControllerWeb(_map, _placementFadeDuration)..load();
-    styleCtrl.globalState.apply(options.globalState);
+    final previous = style?..dispose();
+    final styleCtrl = StyleControllerWeb(_map, _placementFadeDuration)
+      ..load()
+      ..applyGlobalState(options.globalState, previous: previous);
     style = styleCtrl;
     effectiveWidget.onStyleLoaded?.call(styleCtrl);
     attachAnnotations(styleCtrl);

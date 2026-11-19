@@ -102,6 +102,19 @@ void runTests() {
       map.style.sources.setFeatureState(.of(rendered.first), {'big': true});
       await map.waitForFeatures(beside, (features) => features.isNotEmpty);
 
+      // It stays when the data changes.
+      await map.style.sources.updateGeoJsonData(
+        'src',
+        featureCollection([
+          const Feature(geometry: Point(_point), id: 1, properties: {'a': 1}),
+        ]),
+      );
+      await map.waitForFeatures(
+        beside,
+        (features) => features.any((f) => f.properties['a'] == 1),
+      );
+      expect(map.style.sources.featureState(feature), {'big': true});
+
       map.style.sources.clearFeatureState('src');
       await map.waitForFeatures(beside, (features) => features.isEmpty);
     });
@@ -143,6 +156,17 @@ void runTests() {
       );
       await expectShown(shown: true);
       expect(map.style.globalState, {'show': true, 'radius': 40});
+
+      // A value removed with a style switch goes back to the default of the
+      // new style, also where the map keeps global state across styles.
+      final secondStyle = map.style;
+      await map.setOptions(_options());
+      await map.pumpUntil(
+        () => map.controller.style != secondStyle,
+        reason: () => 'the third style did not load',
+      );
+      await expectShown(shown: false);
+      expect(map.style.globalState, {'show': false, 'radius': 40});
     });
 
     testWidgets('reads and changes the light', (tester) async {
@@ -157,6 +181,11 @@ void runTests() {
         ..position = const .literal([1.5, 90, 80])
         ..colorTransition = const StyleTransition(duration: Duration.zero);
       expect(light.intensity, const Literal(0.8));
+      // Back to the defaults, which the map gets explicitly.
+      light
+        ..intensity = null
+        ..colorTransition = null;
+      expect(light.intensity, const Literal(0.5));
       await map.waitForLatestFrame();
       expect(map.events.whereType<MapEventError>(), isEmpty);
     });

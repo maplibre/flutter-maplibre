@@ -124,6 +124,9 @@ class MapOptions {
   /// removed, or whose value is null, goes back to the style's default.
   /// [StyleController.globalState] reads the result.
   ///
+  /// The values must be JSON values: bool, num, String, and lists and maps
+  /// of them.
+  ///
   /// ```dart
   /// MapOptions(globalState: {'units': imperial ? 'imperial' : 'metric'})
   /// ```

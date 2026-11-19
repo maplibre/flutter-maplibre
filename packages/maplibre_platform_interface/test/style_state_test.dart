@@ -76,9 +76,46 @@ void main() {
       expect(sources.featureState(feature), isEmpty);
     });
 
-    test('checks the source and its source layer', () {
+    test('drops the entry of a feature without state', () {
+      const feature = FeatureRef(sourceId: 'g', id: 1);
+      sources
+        ..setFeatureState(feature, {'hover': true})
+        ..removeFeatureState(feature, key: 'hover');
+      expect(sources.featureState(feature), same(const <String, Object?>{}));
+    });
+
+    test('goes with updateTiles and updateTileJsonUrl', () async {
+      await sources.add(
+        const VectorSource.tiles(id: 't', tiles: ['https://t']),
+      );
+      const tiles = FeatureRef(sourceId: 't', sourceLayer: 'a', id: 1);
+      const url = FeatureRef(sourceId: 'v', sourceLayer: 'b', id: 1);
+      sources
+        ..setFeatureState(tiles, {'on': true})
+        ..setFeatureState(url, {'on': true});
+      backend.calls.clear();
+      await sources.updateTiles('t', ['https://u']);
+      await sources.updateTileJsonUrl('v', 'https://w');
+      expect(sources.featureState(tiles), isEmpty);
+      expect(sources.featureState(url), isEmpty);
+      expect(backend.calls.where((call) => call.startsWith('remove')), [
+        'removeFeatureState t a null null',
+        'removeFeatureState v b null null',
+      ]);
+    });
+
+    test('does nothing for a missing source', () {
+      const feature = FeatureRef(sourceId: 'missing', id: 1);
+      sources
+        ..setFeatureState(feature, {'a': 1})
+        ..removeFeatureState(feature)
+        ..clearFeatureState('missing');
+      expect(sources.featureState(feature), isEmpty);
+      expect(backend.calls, isEmpty);
+    });
+
+    test('checks the source type and its source layer', () {
       for (final feature in const [
-        FeatureRef(sourceId: 'missing', id: 1),
         FeatureRef(sourceId: 'v', id: 1),
         FeatureRef(sourceId: 'g', sourceLayer: 'a', id: 1),
         FeatureRef(sourceId: 'r', id: 1),
@@ -101,6 +138,23 @@ void main() {
         ..setFeatureState(feature, {'hover': true});
       expect(sources.featureState(feature), isEmpty);
       expect(backend.calls, isEmpty);
+    });
+
+    test('can clear the map when the style is replaced', () {
+      sources
+        ..setFeatureState(const FeatureRef(sourceId: 'g', id: 1), {'a': 1})
+        ..setFeatureState(
+          const FeatureRef(sourceId: 'v', sourceLayer: 'b', id: 1),
+          {'a': 1},
+        );
+      backend.calls.clear();
+      sources
+        ..markReplaced(clearFeatureState: true)
+        ..markReplaced(clearFeatureState: true);
+      expect(backend.calls, [
+        'removeFeatureState g null null null',
+        'removeFeatureState v b null null',
+      ]);
     });
 
     test('refers to a rendered feature', () {
@@ -136,35 +190,40 @@ void main() {
   });
 
   group('global state', () {
+    late _Style style;
     late StyleGlobalState state;
+    const styleJson = {
+      'state': {
+        'units': {'default': 'metric'},
+        'theme': {'default': 'day'},
+      },
+    };
 
     setUp(() {
-      state = StyleGlobalState(backend)
-        ..load({
-          'units': {'default': 'metric'},
-          'theme': {'default': 'day'},
-        });
+      style = _Style(backend)..loadStyleState(styleJson);
+      state = style.globalState;
     });
 
     test('reads the defaults, overridden by the values', () {
       expect(state, {'units': 'metric', 'theme': 'day'});
-      state.apply({'units': 'imperial', 'extra': 1});
+      style.applyGlobalState({'units': 'imperial', 'extra': 1});
       expect(state, {'units': 'imperial', 'theme': 'day', 'extra': 1});
       expect(() => state['units'] = 'x', throwsUnsupportedError);
     });
 
     test('sends only what changed, and defaults for removed values', () {
-      state.apply({'units': 'imperial', 'theme': 'night'});
-      state.apply({
-        'units': 'imperial',
-        'theme': null,
-        'list': [1, 2],
-      });
-      state.apply({
-        'units': 'imperial',
-        'list': [1, 2],
-      });
-      state.apply(const {});
+      style
+        ..applyGlobalState({'units': 'imperial', 'theme': 'night'})
+        ..applyGlobalState({
+          'units': 'imperial',
+          'theme': null,
+          'list': [1, 2],
+        })
+        ..applyGlobalState({
+          'units': 'imperial',
+          'list': [1, 2],
+        })
+        ..applyGlobalState(const {});
       expect(backend.calls, [
         'setGlobalStateProperty units imperial',
         'setGlobalStateProperty theme night',
@@ -176,13 +235,50 @@ void main() {
       expect(state, {'units': 'metric', 'theme': 'day'});
     });
 
+    test('resets what the previous style set, once the defaults are known', () {
+      style.applyGlobalState({'units': 'imperial', 'theme': 'night'});
+      backend.calls.clear();
+      // As not on web: the values go to the map before the style JSON is
+      // read.
+      final next = _Style(backend)
+        ..applyGlobalState({'theme': 'night'}, previous: style);
+      expect(backend.calls, ['setGlobalStateProperty theme night']);
+      next.loadStyleState({
+        'state': {
+          'units': {'default': 'feet'},
+        },
+      });
+      expect(backend.calls.last, 'setGlobalStateProperty units feet');
+      expect(next.globalState, {'units': 'feet', 'theme': 'night'});
+
+      // As on web: the style JSON first.
+      backend.calls.clear();
+      _Style(backend)
+        ..loadStyleState(styleJson)
+        ..applyGlobalState(const {}, previous: next);
+      expect(backend.calls, ['setGlobalStateProperty theme day']);
+    });
+
     test('a replaced style takes no change', () {
-      state
-        ..markReplaced()
-        ..apply({'units': 'imperial'});
+      style
+        ..markStyleStateReplaced()
+        ..applyGlobalState({'units': 'imperial'});
       expect(backend.calls, isEmpty);
       expect(state['units'], 'metric');
     });
+  });
+
+  test('transition', () {
+    final style = _Style(backend)
+      ..loadStyleState({
+        'transition': {'duration': 100},
+      });
+    expect(style.transition.duration, const Duration(milliseconds: 100));
+    style.transition = const StyleTransition(duration: Duration.zero);
+    style
+      ..markStyleStateReplaced()
+      ..transition = const StyleTransition();
+    expect(backend.calls, ['setTransition 0 0']);
   });
 
   group('light', () {
@@ -201,12 +297,29 @@ void main() {
         ..anchor = null;
       expect(light.anchor, const Literal(LightAnchor.viewport));
       expect(light.intensityTransition?.duration, const Duration(seconds: 1));
+      // The removed anchor goes to its default explicitly, as gl-js keeps
+      // what is left out.
       expect(
         backend.calls.last,
-        'setLight {intensity: 0.2, color: #ff0000, '
+        'setLight {anchor: viewport, intensity: 0.2, color: #ff0000, '
         'intensity-transition: {duration: 1000, delay: 0}}',
       );
       expect(backend.calls, hasLength(3));
+    });
+
+    test('resets a removed property and transition', () {
+      final light = StyleLight(backend)..load(null);
+      light
+        ..intensity = const .literal(0.8)
+        ..colorTransition = const StyleTransition()
+        ..intensity = null
+        ..colorTransition = null;
+      expect(light.intensity, const Literal(0.5));
+      expect(light.toJson(), isEmpty);
+      expect(
+        backend.calls.last,
+        'setLight {intensity: 0.5, color-transition: {}}',
+      );
     });
 
     test('a replaced style takes no change', () {
@@ -229,4 +342,26 @@ void main() {
       isNot(const MapOptions(globalState: {'a': 2})),
     );
   });
+}
+
+/// A style controller with the shared style state, which sends its changes
+/// to [backend].
+class _Style extends StyleController with StyleStateMixin {
+  _Style(this.backend);
+
+  final RecordingStyleBackend backend;
+
+  @override
+  void setGlobalStateProperty(String name, Object? value) =>
+      backend.setGlobalStateProperty(name, value);
+
+  @override
+  void setLight(Map<String, Object?> json) => backend.setLight(json);
+
+  @override
+  void setTransition(StyleTransition transition) =>
+      backend.setTransition(transition);
+
+  @override
+  Object? noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

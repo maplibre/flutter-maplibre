@@ -41,7 +41,8 @@ together, with diagrams.
   - `lib/src/style/`: `style_owner.dart`, `expressions/`, `layers/` (with
     `style_layers.g.dart` and the light `style_light.g.dart`, generated from
     the style spec), `sources/` (with `FeatureRef` and the feature state of
-    `style_sources.dart`), `style_global_state.dart`, and
+    `style_sources.dart`), `style_state.dart` (global state, and the mixin of
+    the light, global state and transition), and
     `style_backend.dart`, what the style collections need from a platform.
   - `lib/src/widget/`: `MapLibreMap` and its state, `map_plugin.dart`,
     `map_plugin_registry.dart`, and `inherited_model.dart` behind

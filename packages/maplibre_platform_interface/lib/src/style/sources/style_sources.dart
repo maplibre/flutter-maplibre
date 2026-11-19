@@ -49,6 +49,10 @@ final class StyleSources extends Iterable<Source> implements Listenable {
   var _replaced = false;
   var _warnedReplaced = false;
 
+  /// The missing sources that debug builds warned about a feature state
+  /// change for.
+  final _warnedMissing = <String>{};
+
   /// The part of the map that owns some of the sources, see
   /// [setStyleSourcesOwner].
   StyleOwner? _styleOwner;
@@ -186,7 +190,7 @@ final class StyleSources extends Iterable<Source> implements Listenable {
   ///
   /// A source that had a TileJSON URL uses [tiles] from now on. Not on web,
   /// the layers of the source are removed and added again, which [StyleLayer]
-  /// objects don't notice.
+  /// objects don't notice. The feature state of the source is cleared.
   Future<void> updateTiles(String id, List<String> tiles) async {
     if (_detachedOrWarn()) return;
     final specification = {..._tileSpecification(id), 'tiles': tiles}
@@ -200,7 +204,7 @@ final class StyleSources extends Iterable<Source> implements Listenable {
   ///
   /// A source that had tile URLs uses [url] from now on. Not on web, the
   /// layers of the source are removed and added again, which [StyleLayer]
-  /// objects don't notice.
+  /// objects don't notice. The feature state of the source is cleared.
   Future<void> updateTileJsonUrl(String id, String url) async {
     if (_detachedOrWarn()) return;
     final specification = {..._tileSpecification(id), 'url': url}
@@ -219,18 +223,22 @@ final class StyleSources extends Iterable<Source> implements Listenable {
   ///
   /// The change reaches the map without waiting, in order with other changes.
   /// The state stays while the source is on the map, also when its data
-  /// changes, and goes with the source or the style.
+  /// changes. It goes with the source or the style, and with [updateTiles]
+  /// and [updateTileJsonUrl].
   ///
   /// Only GeoJSON and vector sources have feature state. Fails with an
-  /// [ArgumentError] if the style has no such source, or if [feature] has no
-  /// [FeatureRef.sourceLayer] on a vector source or has one on another
-  /// source.
+  /// [ArgumentError] if [feature] has no [FeatureRef.sourceLayer] on a vector
+  /// source, has one on another source, or is on a source of another type.
+  /// If the style has no such source, as when it was removed while the
+  /// pointer was still on one of its features, it does nothing, and debug
+  /// builds warn once per source.
   void setFeatureState(FeatureRef feature, Map<String, Object?> state) {
     if (_detachedOrWarn()) return;
     final sourceLayer = _featureStateLayer(
       feature.sourceId,
       feature.sourceLayer,
     );
+    if (sourceLayer == null) return;
     final features = _featureStates
         .putIfAbsent(feature.sourceId, () => {})
         .putIfAbsent(sourceLayer, () => {});
@@ -240,15 +248,16 @@ final class StyleSources extends Iterable<Source> implements Listenable {
   }
 
   /// The feature state of [feature], as [setFeatureState] set it, or an empty
-  /// map if it has none.
+  /// map if it has none or the style has no such source.
   ///
-  /// Fails like [setFeatureState] for an unknown source or a wrong
-  /// [FeatureRef.sourceLayer].
+  /// Fails like [setFeatureState] for a wrong [FeatureRef.sourceLayer].
   Map<String, Object?> featureState(FeatureRef feature) {
     final sourceLayer = _featureStateLayer(
       feature.sourceId,
       feature.sourceLayer,
+      warn: false,
     );
+    if (sourceLayer == null) return const {};
     return _featureStates[feature.sourceId]?[sourceLayer]?[feature.id] ??
         const {};
   }
@@ -256,20 +265,25 @@ final class StyleSources extends Iterable<Source> implements Listenable {
   /// Removes the key [key] from the feature state of [feature], or all of its
   /// state if [key] is null.
   ///
-  /// Fails like [setFeatureState] for an unknown source or a wrong
-  /// [FeatureRef.sourceLayer].
+  /// Fails or does nothing like [setFeatureState].
   void removeFeatureState(FeatureRef feature, {String? key}) {
     if (_detachedOrWarn()) return;
     final sourceLayer = _featureStateLayer(
       feature.sourceId,
       feature.sourceLayer,
     );
+    if (sourceLayer == null) return;
     final features = _featureStates[feature.sourceId]?[sourceLayer];
     if (features != null) {
-      if (key == null) {
+      final rest = key == null
+          ? const <String, Object?>{}
+          : ({...?features[feature.id]}..remove(key));
+      // A feature without state keeps no entry, so hovering over many
+      // features doesn't grow the cache.
+      if (rest.isEmpty) {
         features.remove(feature.id);
-      } else if (features[feature.id] case final current?) {
-        features[feature.id] = Map.unmodifiable({...current}..remove(key));
+      } else {
+        features[feature.id] = Map.unmodifiable(rest);
       }
     }
     _backend.removeFeatureState(
@@ -283,26 +297,35 @@ final class StyleSources extends Iterable<Source> implements Listenable {
   /// Removes the feature state of every feature of the source [sourceId], in
   /// the layer [sourceLayer] of a vector source.
   ///
-  /// Fails with an [ArgumentError] if the style has no such source, or if
-  /// [sourceLayer] is null for a vector source or set for another source.
+  /// Fails with an [ArgumentError] if [sourceLayer] is null for a vector
+  /// source or set for another source, and does nothing for a missing source,
+  /// like [setFeatureState].
   void clearFeatureState(String sourceId, {String? sourceLayer}) {
     if (_detachedOrWarn()) return;
     final layer = _featureStateLayer(sourceId, sourceLayer);
+    if (layer == null) return;
     _featureStates[sourceId]?.remove(layer);
     _backend.removeFeatureState(sourceId, sourceLayer: sourceLayer);
   }
 
   /// The key of [sourceLayer] in [_featureStates], after checking that the
-  /// source [sourceId] has feature state in it.
-  String _featureStateLayer(String sourceId, String? sourceLayer) {
+  /// source [sourceId] has feature state in it, or null if the style has no
+  /// such source. Debug builds warn about that once per source if [warn].
+  String? _featureStateLayer(
+    String sourceId,
+    String? sourceLayer, {
+    bool warn = true,
+  }) {
     final source = _sources[sourceId];
     switch (source) {
       case null:
-        throw ArgumentError.value(
-          sourceId,
-          'sourceId',
-          'The style has no such source',
-        );
+        if (warn && _warnedMissing.add(sourceId) && kDebugMode) {
+          debugPrint(
+            'maplibre: the style has no source "$sourceId", so its feature '
+            'state did not change.',
+          );
+        }
+        return null;
       case VectorSource() when sourceLayer == null:
         throw ArgumentError.value(
           sourceLayer,
@@ -368,7 +391,17 @@ final class StyleSources extends Iterable<Source> implements Listenable {
   /// Detaches the collection, when a new style is set on the map. Platforms
   /// call it. The collection still reads the sources of the style on screen,
   /// but takes no change, since the map's commands reach the new style.
-  void markReplaced() => _replaced = true;
+  ///
+  /// With [clearFeatureState], it first removes the feature state it set
+  /// from the map: for a platform whose new style keeps the sources that
+  /// didn't change, and with them their feature state.
+  void markReplaced({bool clearFeatureState = false}) {
+    if (_replaced) return;
+    if (clearFeatureState) {
+      _featureStates.keys.toList().forEach(_clearMapFeatureState);
+    }
+    _replaced = true;
+  }
 
   /// Forgets every source, when the style goes away. Platforms call it after
   /// [markReplaced]. It empties the collection but does not stop
@@ -433,6 +466,22 @@ final class StyleSources extends Iterable<Source> implements Listenable {
   void _replaceTileSource(String id, Map<String, Object?> specification) {
     _sources[id] = Source.fromJson(id, specification);
     _specifications[id] = specification;
+    // Not on web, the map adds the source again without its feature state,
+    // so it goes on every platform.
+    _clearMapFeatureState(id);
+  }
+
+  /// Removes the feature state of the source [id] from the map and the cache,
+  /// per source layer, as gl-js needs the layer of a vector source.
+  void _clearMapFeatureState(String id) {
+    final layers = _featureStates.remove(id);
+    if (layers == null) return;
+    for (final layer in layers.keys) {
+      _backend.removeFeatureState(
+        id,
+        sourceLayer: layer.isEmpty ? null : layer,
+      );
+    }
   }
 }
 

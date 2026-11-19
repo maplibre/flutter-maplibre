@@ -101,14 +101,25 @@
   the C API would be async. `clearFeatureState` is its own method because
   removing a key needs a feature id. The collection checks the source and the
   source layer (vector sources need one, GeoJSON takes none), as gl-js
-  rejects either with an error event. On web, GeoJSON ids must be
-  non-negative integers; native takes any id (`FeatureIdUintValue` and
-  friends).
+  rejects either with an error event; a missing source only warns in debug
+  builds, as a hover callback can race the removal of its source. On web,
+  GeoJSON ids must be non-negative integers; native takes any id
+  (`FeatureIdUintValue` and friends). The state goes with `updateTiles` and
+  `updateTileJsonUrl` on every platform (native adds the source again), and
+  web clears it from the map when a new style is set, as gl-js's diffed
+  `setStyle` keeps unchanged sources with their state.
 - **The light is a generated `StyleLight`, its own controller like a style
   layer, on `StyleController.light`.** It is part of the style document, so
   it is read from the style JSON on load and resets with a new style. Every
   change sends the whole light (native `setStyleLightJson`, gl-js
-  `setLight`), as gl-js has no per-property setter.
+  `setLight`), as gl-js has no per-property setter. gl-js keeps the keys
+  that are left out, so a removed key is sent as its spec default (generated
+  into `StyleLight`) or, for a transition, as `{}`.
+- **`StyleStateMixin` holds the light, the global state and the transition
+  for both platform controllers.** None of it is platform specific; the
+  platforms call `loadStyleState`, `applyGlobalState` and
+  `markStyleStateReplaced`, so `StyleGlobalState` has no public method that
+  changes the map.
 - **`StyleController.transition` is the style's default transition, a
   `StyleTransition` read from the style JSON.** Native sets
   `StyleTransitionOptions` with `enablePlacementTransitions` null, which

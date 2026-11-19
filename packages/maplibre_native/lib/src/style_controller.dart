@@ -10,7 +10,9 @@ import 'package:maplibre_platform_interface/maplibre_platform_interface.dart';
 ///
 /// Sources and layers reach the map as style JSON, the form the C API takes
 /// them in.
-class StyleControllerNative extends StyleController implements StyleBackend {
+class StyleControllerNative extends StyleController
+    with StyleStateMixin
+    implements StyleBackend {
   /// Creates a style controller for a map.
   StyleControllerNative(this._map);
 
@@ -35,22 +37,6 @@ class StyleControllerNative extends StyleController implements StyleBackend {
   @override
   late final StyleLayers layers = StyleLayers(this, sources: sources);
 
-  @override
-  late final StyleLight light = StyleLight(this);
-
-  @override
-  late final StyleGlobalState globalState = StyleGlobalState(this);
-
-  @override
-  StyleTransition get transition => _transition;
-  var _transition = const StyleTransition();
-
-  @override
-  set transition(StyleTransition value) {
-    _transition = value;
-    if (!_replaced) setTransition(value);
-  }
-
   List<String> _cachedAttributions = const [];
   var _disposed = false;
 
@@ -66,8 +52,7 @@ class StyleControllerNative extends StyleController implements StyleBackend {
     _replacedByNewer = true;
     layers.markReplaced();
     sources.markReplaced();
-    light.markReplaced();
-    globalState.markReplaced();
+    markStyleStateReplaced();
   }
 
   /// Fills [layers] and [sources] from the style that the map loaded, and
@@ -81,13 +66,7 @@ class StyleControllerNative extends StyleController implements StyleBackend {
     if (style case {'layers': final List<Object?> styleLayers}) {
       layers.load(styleLayers.whereType<Map<String, Object?>>());
     }
-    if (style case final Map<String, Object?> style) {
-      light.load(style['light']);
-      globalState.load(style['state']);
-      if (style['transition'] case final Map<String, Object?> transition) {
-        _transition = StyleTransition.fromJson(transition);
-      }
-    }
+    if (style case final Map<String, Object?> style) loadStyleState(style);
     await refreshAttributions();
   }
 

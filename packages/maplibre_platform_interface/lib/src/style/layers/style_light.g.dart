@@ -80,6 +80,14 @@ final class StyleLight extends _StyleLightBase {
 
   set intensityTransition(StyleTransition? value) =>
       _setTransition('intensity', value);
+
+  @override
+  Map<String, Object?> get _defaults => const {
+    'anchor': 'viewport',
+    'position': [1.15, 210, 30],
+    'color': '#ffffff',
+    'intensity': 0.5,
+  };
 }
 
 /// Whether extruded geometries are lit relative to the map or viewport.

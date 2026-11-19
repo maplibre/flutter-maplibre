@@ -149,3 +149,6 @@
   style gets every value right in its load callback, before the style JSON
   is read, so its first frames already use them; web doesn't pass gl-js's
   `globalState` option, so that both platforms apply the values the same way.
+  A map can keep global state across a style switch (gl-js's diffed
+  `setStyle` does), so the new style also resets the keys that the previous
+  one set and the options no longer have, once its defaults are read.

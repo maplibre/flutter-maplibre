@@ -31,7 +31,7 @@ Future<void> _onStyleLoaded(StyleController style) async {
       onEnter: (event) =>
           style.sources.setFeatureState(.of(event.feature), {'hover': true}),
       onLeave: (event) =>
-          style.sources.setFeatureState(.of(event.feature), {'hover': false}),
+          style.sources.removeFeatureState(.of(event.feature), key: 'hover'),
     ),
   );
 }
@@ -48,7 +48,12 @@ source, its source layer. `FeatureRef.of` takes them from a
   source layer of a vector source).
 - The calls reach the map without waiting, in order with other changes.
 - The state stays while the source is on the map, also when its data
-  changes, and goes with the source or the style.
+  changes. It goes with the source or the style, and with `updateTiles` and
+  `updateTileJsonUrl`.
+- A call for a source that the style doesn't have does nothing, so a hover
+  callback doesn't fail when its source was just removed. Debug builds warn.
+
+<a href="../../../demo/#/style-layers/hover">Try it in the demo.</a>
 
 ## Details
 

@@ -1,7 +1,9 @@
 part of 'map_state.dart';
 
 /// Web specific implementation of the [StyleController].
-class StyleControllerWeb extends StyleController implements StyleBackend {
+class StyleControllerWeb extends StyleController
+    with StyleStateMixin
+    implements StyleBackend {
   /// Create a new [StyleControllerWeb] instance for the style that [_map]
   /// loaded, whose label placement transitions are on and fade over
   /// [_placementFadeDuration] milliseconds.
@@ -31,9 +33,10 @@ class StyleControllerWeb extends StyleController implements StyleBackend {
     _frozenAttributions = attributions;
     _replacedByNewer = true;
     layers.markReplaced();
-    sources.markReplaced();
-    light.markReplaced();
-    globalState.markReplaced();
+    // gl-js's diffed setStyle keeps the sources that didn't change, with
+    // their feature state, which goes with the style on every platform.
+    sources.markReplaced(clearFeatureState: !_disposed);
+    markStyleStateReplaced();
   }
 
   /// Sets gl-js's fade duration, which the map reads on every frame: 0 shows
@@ -50,22 +53,6 @@ class StyleControllerWeb extends StyleController implements StyleBackend {
   @override
   late final StyleLayers layers = StyleLayers(this, sources: sources);
 
-  @override
-  late final StyleLight light = StyleLight(this);
-
-  @override
-  late final StyleGlobalState globalState = StyleGlobalState(this);
-
-  @override
-  StyleTransition get transition => _transition;
-  var _transition = const StyleTransition();
-
-  @override
-  set transition(StyleTransition value) {
-    _transition = value;
-    if (!_replaced) setTransition(value);
-  }
-
   /// Fills [layers] and [sources] from the style that the map loaded.
   void load() {
     final style = _map.getStyle();
@@ -77,11 +64,7 @@ class StyleControllerWeb extends StyleController implements StyleBackend {
     if (json case {'layers': final List<Object?> styleLayers}) {
       layers.load(styleLayers.whereType<Map<String, Object?>>());
     }
-    light.load(json['light']);
-    globalState.load(json['state']);
-    if (json['transition'] case final Map<String, Object?> transition) {
-      _transition = StyleTransition.fromJson(transition);
-    }
+    loadStyleState(json);
     _attributions = attributions;
   }
 
