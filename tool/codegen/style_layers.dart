@@ -32,18 +32,21 @@ const _layerTypes = [
 ];
 
 Future<void> main(List<String> args) async {
-  final spec = jsonDecode(
-    args.isEmpty
-        ? await _download(Uri.parse(_specUrl))
-        : File(args.single).readAsStringSync(),
-  ) as Map<String, Object?>;
+  final spec =
+      jsonDecode(
+            args.isEmpty
+                ? await _download(Uri.parse(_specUrl))
+                : File(args.single).readAsStringSync(),
+          )
+          as Map<String, Object?>;
   final package = Platform.script.resolve(
     '../../packages/maplibre_platform_interface/lib/src/style/',
   );
   final outputs = {
     package.resolve('layers/style_layers.g.dart'): _Generator(spec).generate(),
-    package.resolve('layers/style_light.g.dart'): _Generator(spec)
-        .generateLight(),
+    package.resolve('layers/style_light.g.dart'): _Generator(
+      spec,
+    ).generateLight(),
     package.resolve('expressions/spec_operators.g.dart'): _operators(spec),
   };
   for (final MapEntry(:key, :value) in outputs.entries) {
