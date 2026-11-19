@@ -9,8 +9,8 @@ description: 'Map options, camera updates and animations, gestures, feature quer
 ## Map options
 
 `MapOptions` configures a `MapLibreMap`. Every option except `initCamera`,
-`fastPforEnabled` and `localIdeographFontFamily` can change at any time, for
-example with `setState()`, and the map follows:
+`fastPforEnabled`, `localIdeographFontFamily` and `preserveDrawingBuffer` can
+change at any time, for example with `setState()`, and the map follows:
 
 ```dart
 MapLibreMap(
@@ -40,6 +40,7 @@ MapLibreMap(
 | `gestures`              | Which gestures move the map, see [Gestures](#gestures).                         |
 | `fastPforEnabled`       | Decode MLT tiles that use FastPFOR, see [Sources](sources/tiles.md#maplibre-tiles-mlt). Only read once. Always on for web. |
 | `localIdeographFontFamily` | Draw CJK ideographs, kana and Hangul with the device's fonts, a CSS font-family list, instead of downloading the style's glyphs. Defaults to `'sans-serif'`; `null` draws the style's glyphs. Only read once. Only on iOS, macOS and web. |
+| `preserveDrawingBuffer`  | Keep the image of each frame, which [Capture the map](#capture-the-map) reads. Only read once. Only on web. |
 
 ## Initial camera
 
@@ -242,3 +243,30 @@ MapLibreMap(
 `MapController.isRenderingPaused` and the `onRenderingChanged` callback tell
 whether the map renders. On web, the browser already skips hidden maps, so
 `paused` has no effect there.
+
+## Capture the map
+
+`MapController.takeSnapshot()` captures the map as it is shown, encoded as a
+PNG image. The capture covers the map itself: the widgets of
+`MapLibreMap.children` are drawn over it and are not part of it. Use it where
+a capture of the Flutter tree would not show the map, such as a bug report
+that captures the screen, because the map is not part of what Flutter draws:
+
+```dart
+final png = await controller.takeSnapshot();
+```
+
+The image is the size of the map in logical pixels multiplied by
+`pixelRatio`, which defaults to the device pixel ratio, so the capture has
+the resolution of the screen.
+
+The map must have drawn a frame, which it has not right after it was created:
+wait for `onRenderFrame` before capturing from `onMapCreated` or
+`onStyleLoaded`, or the capture shows an empty map. The call returns null
+while the map has no size.
+
+On web the map draws in a canvas that keeps the image of a frame only with
+`MapOptions.preserveDrawingBuffer`, so `takeSnapshot` throws an
+`UnsupportedError` without that option. Keeping the image costs memory and
+slows the map down on some browsers, so leave the option off where nothing
+captures the map.

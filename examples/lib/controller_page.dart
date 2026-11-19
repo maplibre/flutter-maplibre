@@ -193,6 +193,28 @@ pitch: ${camera.pitch}'''),
                     textAlign: TextAlign.center,
                   ),
                 ),
+                OutlinedButton(
+                  onPressed: () async {
+                    final png = await _controller.takeSnapshot();
+                    if (png == null || !context.mounted) return;
+                    await showDialog<void>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        content: Image.memory(png),
+                        actions: [
+                          TextButton(
+                            onPressed: Navigator.of(context).pop,
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    'Take\nsnapshot',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               ],
             ),
           ),
@@ -203,6 +225,8 @@ pitch: ${camera.pitch}'''),
                   center: Geographic(lon: 9.17, lat: 47.68),
                   zoom: 3,
                 ),
+                // Only web needs it, for takeSnapshot.
+                preserveDrawingBuffer: true,
               ),
               onMapCreated: (controller) => _controller = controller,
             ),

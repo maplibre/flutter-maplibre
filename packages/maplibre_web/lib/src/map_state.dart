@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'dart:math';
-import 'dart:typed_data' show Uint8ClampedList;
+import 'dart:typed_data' show Uint8ClampedList, Uint8List;
 import 'dart:ui';
 import 'dart:ui' as ui;
 import 'dart:ui_web';
@@ -32,6 +32,10 @@ final _noFontNames = RegExp(r'''^[\s,'"]*$''');
 final class MapLibreMapStateWeb extends MapLibreMapState {
   late HTMLDivElement _htmlElement;
   late interop.JsMap _map;
+
+  /// Whether the map keeps the image of each frame, as the options asked
+  /// when it was created, which [takeSnapshot] needs.
+  var _preserveDrawingBuffer = false;
 
   /// The milliseconds that label placement changes fade over while their
   /// transitions are on: the map's own value, read once [_map] exists.
@@ -107,6 +111,8 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
         attributionControl: false,
         // MapGestureDetector handles the input.
         interactive: false,
+        // Keeps the image of each frame, which takeSnapshot reads.
+        preserveDrawingBuffer: options.preserveDrawingBuffer,
         transformRequest: _transformRequest.toJS,
       );
       // gl-js draws the style's glyphs for `false`. A list without names,
@@ -117,6 +123,7 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
           ? false.toJS
           : fontFamily.toJS;
       _map = interop.JsMap(mapOptions);
+      _preserveDrawingBuffer = options.preserveDrawingBuffer;
       // gl-js's default if its private field is gone.
       _placementFadeDuration = _map.fadeDuration ?? 300;
       _mapCreated = true;
@@ -329,6 +336,64 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
             ),
           ),
     );
+  }
+
+  /// Reads the canvas the map draws in, which keeps its image only with
+  /// [MapOptions.preserveDrawingBuffer].
+  @override
+  Future<Uint8List?> takeSnapshot({double? pixelRatio}) async {
+    assert(pixelRatio == null || pixelRatio > 0, 'pixelRatio must be > 0');
+    if (!mounted) return null;
+    final box = context.findRenderObject();
+    // The option reached the map when it was created, so a map that has yet
+    // to be created has nothing to capture and nothing to refuse.
+    if (!_mapCreated || box is! RenderBox || !box.hasSize || box.size.isEmpty) {
+      return null;
+    }
+    if (!_preserveDrawingBuffer) {
+      throw UnsupportedError(
+        'takeSnapshot needs MapOptions.preserveDrawingBuffer, which this map '
+        'was created without.',
+      );
+    }
+    final size = box.size;
+    final ratio = pixelRatio ?? MediaQuery.devicePixelRatioOf(context);
+    // The same size as a capture of the map's layer on the other platforms.
+    final width = (size.width * ratio).ceil();
+    final height = (size.height * ratio).ceil();
+    final canvas = _map.getCanvas();
+    // The canvas has the resolution the browser draws the map in, so it is
+    // scaled for another pixel ratio.
+    if (width == canvas.width && height == canvas.height) return _png(canvas);
+    final scaled = (document.createElement('canvas') as HTMLCanvasElement)
+      ..width = width
+      ..height = height;
+    (scaled.getContext('2d')! as CanvasRenderingContext2D).drawImage(
+      canvas,
+      0,
+      0,
+      width,
+      height,
+    );
+    final png = await _png(scaled);
+    // Releases the pixels of the canvas now rather than at a collection.
+    scaled
+      ..width = 0
+      ..height = 0;
+    return png;
+  }
+
+  /// The pixels of [canvas], encoded as a PNG image. `toBlob` hands the
+  /// bytes to a callback, where `toDataURL` would encode on the main thread
+  /// and go through base64.
+  static Future<Uint8List?> _png(HTMLCanvasElement canvas) async {
+    final encoded = Completer<Blob?>();
+    void onEncoded(Blob? blob) => encoded.complete(blob);
+    canvas.toBlob(onEncoded.toJS, 'image/png');
+    final blob = await encoded.future;
+    if (blob == null) return null;
+    final buffer = await blob.arrayBuffer().toDart;
+    return buffer.toDart.asUint8List();
   }
 
   @override

@@ -72,5 +72,15 @@ void runTests() {
         throwsA(isA<UnsupportedError>()),
       );
     }, skip: kIsWeb);
+
+    testWidgets('capturing the map on web without the drawing buffer', (
+      tester,
+    ) async {
+      final map = await pumpMap(tester);
+      await expectLater(
+        map.controller.takeSnapshot(),
+        throwsA(isA<UnsupportedError>()),
+      );
+    }, skip: !kIsWeb);
   });
 }

@@ -132,3 +132,27 @@
   controller still can, until the next change. Presenting frames in build
   through one texture per ring slot would close the remaining one-frame race
   on native, but changes how every map presents, so it is not done.
+- **`MapController.takeSnapshot()` rasterizes the map's Flutter layer, and
+  every platform implements it; the shared state holds no default.** The
+  native state wraps its `Texture` in a `RepaintBoundary` and draws that
+  boundary with `toImage`, so a capture is the frame on screen, without the
+  widgets over the map, and needs no second render and no new C API. It
+  returns null while the boundary has no size, and in debug builds while it
+  has yet to paint, because waiting for a frame would deadlock a caller that
+  drives the frames itself, such as a widget test. Flutter cannot rasterize
+  a web map, whose element is outside its layer tree, so `MapLibreMapStateWeb`
+  reads the map canvas with `toBlob`, which encodes off the main thread and
+  hands over bytes, and draws it into a canvas of its own when the size
+  asked for is not the canvas's, so a capture has the documented size on
+  every platform. A default implementation in `MapLibreMapState` would have put a
+  repaint boundary on every web map for nothing, hence none.
+- **`MapOptions.preserveDrawingBuffer` is the web opt-in that
+  `takeSnapshot` needs, false by default and read once, as gl-js clears the
+  drawing buffer of its canvas after each frame otherwise.** Keeping the
+  image costs memory and slows some browsers down, so no map pays for it
+  unasked, and `takeSnapshot` throws an `UnsupportedError` naming the option
+  on a map created without it. The state keeps what the options asked at
+  creation, since the option never reaches a map later. Reading the canvas
+  from a `render` callback of a redraw instead would need no option, but it
+  makes a capture wait for a frame of the map and depends on the order of
+  gl-js callbacks, so the map takes the option instead.

@@ -1,3 +1,14 @@
+## Unreleased
+
+### Features
+
+- `MapController.takeSnapshot()` captures the map as it is shown, encoded as
+  a PNG image, without the widgets drawn over it. On web it needs the new
+  `MapOptions.preserveDrawingBuffer`, without which the image of each frame
+  is cleared.
+
+Full Changelog: [v0.4.0...main](https://github.com/maplibre/flutter-maplibre/compare/v0.4.0...main)
+
 ## 0.4.0
 
 `maplibre` is now a MapLibre
