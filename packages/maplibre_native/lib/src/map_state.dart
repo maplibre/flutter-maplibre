@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter/widgets.dart';
 import 'package:maplibre_native/src/extensions.dart';
 import 'package:maplibre_native/src/map_renderer.dart';
@@ -62,6 +65,8 @@ class MapLibreMapStateNative extends MapLibreMapState {
   @override
   late final GestureCameraSink gestureCamera = _NativeGestureCamera(this);
 
+  final GlobalKey _snapshotBoundary = GlobalKey();
+
   @override
   Widget buildPlatformWidget(BuildContext context) {
     final pixelRatio = MediaQuery.devicePixelRatioOf(context);
@@ -88,10 +93,40 @@ class MapLibreMapStateNative extends MapLibreMapState {
         return Listener(
           behavior: HitTestBehavior.opaque,
           onPointerDown: (_) => _map?.discarding.cancelCameraTransitions(),
-          child: Texture(textureId: renderer.textureId),
+          // The boundary gives the map a layer of its own, which
+          // takeSnapshot draws without the widgets over the map.
+          child: RepaintBoundary(
+            key: _snapshotBoundary,
+            child: Texture(textureId: renderer.textureId),
+          ),
         );
       },
     );
+  }
+
+  @override
+  Future<Uint8List?> takeSnapshot({double? pixelRatio}) async {
+    assert(pixelRatio == null || pixelRatio > 0, 'pixelRatio must be > 0');
+    if (!mounted) return null;
+    final boundary = _snapshotBoundary.currentContext?.findRenderObject();
+    if (boundary is! RenderRepaintBoundary ||
+        !boundary.hasSize ||
+        boundary.size.isEmpty) {
+      return null;
+    }
+    // toImage needs the boundary to have painted. Waiting for a frame here
+    // would deadlock a caller that drives the frames itself, such as a
+    // widget test, so a map that has yet to paint gives null instead.
+    if (boundary.debugNeedsPaint) return null;
+    final image = await boundary.toImage(
+      pixelRatio: pixelRatio ?? MediaQuery.devicePixelRatioOf(context),
+    );
+    try {
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      return data == null ? null : Uint8List.sublistView(data);
+    } finally {
+      image.dispose();
+    }
   }
 
   Future<void> _create(mln.LogicalExtent extent, double pixelRatio) async {

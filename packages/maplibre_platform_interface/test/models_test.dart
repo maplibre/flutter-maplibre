@@ -194,6 +194,17 @@ void main() {
       expect(const MapOptions().fastPforEnabled, isFalse);
     });
 
+    test('keeps the image of a frame only where it is asked for', () {
+      expect(const MapOptions().preserveDrawingBuffer, isFalse);
+      const keeps = MapOptions(preserveDrawingBuffer: true);
+      expect(keeps, const MapOptions(preserveDrawingBuffer: true));
+      expect(
+        keeps.hashCode,
+        const MapOptions(preserveDrawingBuffer: true).hashCode,
+      );
+      expect(keeps, isNot(const MapOptions()));
+    });
+
     test('draws CJK with the device fonts by default, as gl-js', () {
       expect(const MapOptions().localIdeographFontFamily, 'sans-serif');
     });

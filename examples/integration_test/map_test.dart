@@ -312,28 +312,54 @@ void runTests() {
     });
 
     testWidgets('captures the map it shows', (tester) async {
-      final map = await pumpMap(tester);
+      // The web keeps the image of a frame only with this option.
+      final map = await pumpMap(
+        tester,
+        options: offlineOptions(preserveDrawingBuffer: true),
+        // Covers the middle of the map, and must not reach the capture.
+        children: const [
+          Center(
+            child: ColoredBox(
+              color: Color(0xffff0000),
+              child: SizedBox.square(dimension: 64),
+            ),
+          ),
+        ],
+      );
       await map.waitForLatestFrame();
-      // The widget over the map must not reach the capture.
-      final png = await map.controller.takeSnapshot(pixelRatio: 1);
+      final png = await map.pumpFuture(
+        map.controller.takeSnapshot(pixelRatio: 1),
+        reason: 'capturing the map',
+      );
       expect(png, isNotNull);
 
       final image = await decodeImageFromList(png!);
       addTearDown(image.dispose);
-      // toImage rounds the size up to the next whole pixel.
+      // A capture rounds the size up to the next whole pixel.
       expect(image.width, map.size.width.ceil());
       expect(image.height, map.size.height.ceil());
 
       final pixels = await image.toByteData();
       final middle = ((image.height ~/ 2) * image.width + image.width ~/ 2) * 4;
-      // The background of the test style, which only the map draws.
-      expect(Uint8List.sublistView(pixels!, middle, middle + 4), [
-        0xdd,
-        0xdd,
-        0xdd,
-        0xff,
-      ]);
-    }, skip: kIsWeb);
+      final center = Uint8List.sublistView(pixels!, middle, middle + 4);
+      // The background of the test style, under the widget over the map,
+      // which the capture leaves out. The browsers convert the colors of a
+      // canvas they read, so the channels are not compared exactly.
+      expect(center[0], closeTo(0xdd, 2));
+      expect(center[1], closeTo(0xdd, 2));
+      expect(center[2], closeTo(0xdd, 2));
+      expect(center[3], 0xff);
+
+      // Another pixel ratio than the screen's, which the map renders in.
+      final twice = await map.pumpFuture(
+        map.controller.takeSnapshot(pixelRatio: 2),
+        reason: 'capturing the map at twice its resolution',
+      );
+      final larger = await decodeImageFromList(twice!);
+      addTearDown(larger.dispose);
+      expect(larger.width, (map.size.width * 2).ceil());
+      expect(larger.height, (map.size.height * 2).ceil());
+    });
   });
 }
 

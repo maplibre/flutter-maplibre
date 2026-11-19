@@ -170,17 +170,16 @@ abstract interface class MapController {
   /// of the screen.
   ///
   /// Use it where a capture of the Flutter tree would not show the map, such
-  /// as a bug report that captures the screen: the map draws in a texture of
-  /// its own, which such a capture leaves out.
+  /// as a bug report that captures the screen: the map is not part of what
+  /// Flutter draws, so such a capture leaves it out.
   ///
   /// The map must have drawn a frame, which it has not right after it was
   /// created: wait for [MapLibreMap.onRenderFrame] before capturing from
-  /// [MapLibreMap.onMapCreated] or [MapLibreMap.onStyleLoaded]. Returns null
-  /// while the map has no size, and, in debug builds, while it has yet to be
-  /// drawn.
+  /// [MapLibreMap.onMapCreated] or [MapLibreMap.onStyleLoaded], or the
+  /// capture shows an empty map. Returns null while the map has no size,
+  /// and, in debug builds and not on web, while it has yet to paint.
   ///
-  /// The web shows the map in an HTML element rather than in a texture, and
-  /// MapLibre GL JS clears its drawing buffer after each frame, so this
-  /// throws an [UnsupportedError] there.
+  /// Throws an [UnsupportedError] on web for a map created without
+  /// [MapOptions.preserveDrawingBuffer].
   Future<Uint8List?> takeSnapshot({double? pixelRatio});
 }

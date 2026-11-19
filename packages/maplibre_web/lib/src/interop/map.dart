@@ -202,6 +202,7 @@ extension type MapOptions._(JSObject _) implements JSObject {
     required JSObject container,
     required bool attributionControl,
     bool? interactive,
+    bool? preserveDrawingBuffer,
     JSFunction? transformRequest,
   });
 

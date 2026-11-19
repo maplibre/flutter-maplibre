@@ -24,6 +24,7 @@ class MapOptions {
     this.gestures = const MapGestures(),
     this.fastPforEnabled = false,
     this.localIdeographFontFamily = 'sans-serif',
+    this.preserveDrawingBuffer = false,
   });
 
   /// Find the [MapOptions] of the closest [MapLibreMap] in the widget tree.
@@ -114,6 +115,18 @@ class MapOptions {
   /// give that map its fonts.
   final String? localIdeographFontFamily;
 
+  /// Whether the map keeps the image of each frame, so that
+  /// [MapController.takeSnapshot] can read it. Defaults to false.
+  ///
+  /// Only on web, where the map draws in a canvas that is cleared after
+  /// each frame unless this is set, so [MapController.takeSnapshot] throws
+  /// an [UnsupportedError] without it. Keeping the image costs memory and
+  /// slows the map down on some browsers, so leave it off where nothing
+  /// captures the map.
+  ///
+  /// Read once, when the map is created: changing it later has no effect.
+  final bool preserveDrawingBuffer;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -128,7 +141,8 @@ class MapOptions {
           movements == other.movements &&
           gestures == other.gestures &&
           fastPforEnabled == other.fastPforEnabled &&
-          localIdeographFontFamily == other.localIdeographFontFamily;
+          localIdeographFontFamily == other.localIdeographFontFamily &&
+          preserveDrawingBuffer == other.preserveDrawingBuffer;
 
   @override
   int get hashCode => Object.hash(
@@ -143,5 +157,6 @@ class MapOptions {
     gestures,
     fastPforEnabled,
     localIdeographFontFamily,
+    preserveDrawingBuffer,
   );
 }
