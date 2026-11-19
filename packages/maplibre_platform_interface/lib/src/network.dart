@@ -180,7 +180,10 @@ abstract final class MapLibreNetwork {
   /// or to test offline regions without turning off the device network.
   ///
   /// The setting applies to the whole app process, also to the maps of
-  /// other Flutter engines. Not on web, where it has no effect.
+  /// other Flutter engines, and it outlives a hot restart. When the first
+  /// map or [OfflineManager] of an engine starts while the process is
+  /// offline, [offline] turns true to match. Not on web, where it has no
+  /// effect.
   static bool get offline => _offline;
 
   static set offline(bool value) {

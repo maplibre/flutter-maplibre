@@ -175,9 +175,8 @@ void runTests() {
       final map = await pumpMap(tester);
       MapLibreNetwork.offline = true;
       final since = map.styleLoads;
-      // A URL that no other test requested, so the cache doesn't have it.
       await map.setOptions(
-        MapOptions(style: MapStyle.url('${server.origin}/style.json?offline')),
+        MapOptions(style: MapStyle.url('${server.origin}/style.json')),
       );
       final until = DateTime.now().add(const Duration(seconds: 1));
       await map.pumpUntil(

@@ -76,8 +76,10 @@ MapLibreNetwork.offline = true;
 
 While offline, maps show what is in the cache and in the offline regions.
 Requests for other resources, and offline region downloads, wait and start
-once `offline` is false again. The setting applies to the whole app process.
-Not on web, where it has no effect.
+once `offline` is false again. The setting applies to the whole app process,
+also to the maps of other Flutter engines, and outlives a hot restart: when
+the first map or `OfflineManager` of an engine starts while the process is
+offline, `offline` turns true to match. Not on web, where it has no effect.
 
 `MapLibreNetwork.reset()` removes the headers and the transform and goes
 online again.
