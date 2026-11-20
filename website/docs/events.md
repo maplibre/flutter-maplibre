@@ -51,7 +51,7 @@ same on every platform.
 | `onCameraMoveEnd`     | The camera stopped moving. Holds the `CameraPosition` it ended at and the `reason`.                    |
 | `onIdle`              | The map finished rendering and no animation runs.                                                 |
 | `onError`             | The style, a source, glyphs or a sprite failed to load, or rendering failed.                      |
-| `onStyleImageMissing` | A layer uses an image that the style doesn't have. Add it with `StyleController.addImage`.        |
+| `onStyleImageMissing` | A layer uses an image that the style doesn't have, and `resolveStyleImage` didn't add it.       |
 | `onLoadingStarted`    | The map starts to load a style.                                                                   |
 | `onLoadingFinished`   | The map loaded its style and what the view needs.                                                 |
 | `onSourceChanged`     | A source of the style changed, such as when its TileJSON arrives.                                 |

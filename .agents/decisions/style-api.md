@@ -76,6 +76,14 @@
   Web `addImage` decodes bytes with the browser's `createImageBitmap`, and
   the helpers hand their `ui.Image` to `addImageFromUiImage`, which passes
   its raw pixels (straight RGBA on web, premultiplied on native).
+- **`getImage` returns straight RGBA on every platform**, as gl-js does;
+  native unpremultiplies. `updateImage` checks the size on both platforms
+  (gl-js only fires an error event) and keeps the image's pixel ratio and
+  options (native reads them back, as the C API replaces the image).
+- **`resolveStyleImage` is awaited before `onStyleImageMissing`**, which
+  then only reports images that are still missing. On web it is gl-js's
+  `setMissingStyleImageResolver`; gl-js 6 made `styleimagemissing`
+  notify-only. It is on `MapLibreMap` only, not on `MapPlugin`.
 - **Animations change paint, not data.** The animation page adds its path
   once and moves a `step` on `line-progress` in `LineStyleLayer.gradient`. A GeoJSON
   update per frame re-encodes the data in Dart, parses and indexes it on the

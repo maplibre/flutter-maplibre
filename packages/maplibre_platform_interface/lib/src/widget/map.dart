@@ -32,6 +32,7 @@ class MapLibreMap extends StatefulWidget {
     this.onIdle,
     this.onError,
     this.onStyleImageMissing,
+    this.resolveStyleImage,
     this.onLoadingStarted,
     this.onLoadingFinished,
     this.onSourceChanged,
@@ -76,6 +77,7 @@ class MapLibreMap extends StatefulWidget {
     this.onIdle,
     this.onError,
     this.onStyleImageMissing,
+    this.resolveStyleImage,
     this.onLoadingStarted,
     this.onLoadingFinished,
     this.onSourceChanged,
@@ -255,6 +257,15 @@ class MapLibreMap extends StatefulWidget {
   /// Called when a layer uses an image that the style doesn't have. Add it
   /// with [StyleController.addImage] to show it.
   final MapEventCallback<MapEventStyleImageMissing>? onStyleImageMissing;
+
+  /// Called when a layer uses an image that the style doesn't have, to add
+  /// it, for example with [StyleController.addImage]. The map waits for the
+  /// returned [Future], and calls [onStyleImageMissing] only if the image is
+  /// still missing. Errors it throws are reported to [FlutterError.onError].
+  ///
+  /// Not on web, the frame that needs the image is drawn without it, and the
+  /// icon shows once the image is added.
+  final StyleImageResolver? resolveStyleImage;
 
   /// Called when the map starts to load a style.
   final MapEventCallback<MapEventLoadingStarted>? onLoadingStarted;

@@ -211,6 +211,30 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
           );
         }.toJS,
       );
+      // gl-js awaits the resolver, then fires styleimagemissing for the
+      // images that are still missing.
+      _map.setMissingStyleImageResolver(
+        ((String id) {
+          final resolve = effectiveWidget.resolveStyleImage;
+          final style = this.style;
+          if (resolve == null || style == null) return null;
+          // gl-js ignores a failed resolver, so its error is reported here.
+          return Future.sync(() => resolve(style, id))
+              .catchError((Object error, StackTrace stack) {
+                FlutterError.reportError(
+                  FlutterErrorDetails(
+                    exception: error,
+                    stack: stack,
+                    library: 'maplibre_web',
+                    context: ErrorDescription(
+                      'while resolving the style image "$id"',
+                    ),
+                  ),
+                );
+              })
+              .toJS;
+        }).toJS,
+      );
       _map.on(
         interop.MapEventType.styleImageMissing,
         (interop.MapStyleImageMissingEvent event) {

@@ -17,6 +17,7 @@ import 'package:maplibre_example/offline_page.dart';
 import 'package:maplibre_example/parameters_page.dart';
 import 'package:maplibre_example/paused_rendering_page.dart';
 import 'package:maplibre_example/pmtiles_page.dart';
+import 'package:maplibre_example/style_images_page.dart';
 import 'package:maplibre_example/style_layers_circle_page.dart';
 import 'package:maplibre_example/style_layers_fill_extrusion_page.dart';
 import 'package:maplibre_example/style_layers_fill_page.dart';
@@ -258,6 +259,11 @@ class MenuPage extends StatelessWidget {
                           label: 'Symbol',
                           iconData: Icons.emoji_emotions,
                           location: StyleLayersSymbolPage.location,
+                        ),
+                        ItemCard(
+                          label: 'Style Images',
+                          iconData: Icons.animation,
+                          location: StyleImagesPage.location,
                         ),
                       ],
                     ),

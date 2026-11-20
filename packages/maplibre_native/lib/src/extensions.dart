@@ -4,6 +4,8 @@
 library;
 
 import 'dart:convert';
+import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/widgets.dart' show EdgeInsets;
@@ -39,7 +41,7 @@ extension MapLibreMapExt on MapLibreMap {
       (onLoadingFinished != null
           ? mln.RuntimeEventFlag.mapLoadingFinished
           : mln.RuntimeEventFlag.none) |
-      (onStyleImageMissing != null
+      (onStyleImageMissing != null || resolveStyleImage != null
           ? mln.RuntimeEventFlag.mapStyleImageMissing
           : mln.RuntimeEventFlag.none) |
       (onTile != null
@@ -84,7 +86,58 @@ extension StyleImageOptionsExt on StyleImageOptions {
     },
     textFitWidth: textFitWidth?.toMln(),
     textFitHeight: textFitHeight?.toMln(),
+    keepUnused: keepUnused,
   );
+}
+
+/// Extension methods for the [mln.StyleImageInfo] class.
+extension MlnStyleImageInfoExt on mln.StyleImageInfo {
+  /// This image, with its premultiplied pixels converted to straight alpha.
+  StyleImage toStyleImage() {
+    final straight = Uint8List(width * height * 4);
+    for (var i = 0; i < straight.length; i += 4) {
+      final alpha = pixels[i + 3];
+      straight[i + 3] = alpha;
+      if (alpha == 0) continue;
+      for (var c = i; c < i + 3; c++) {
+        straight[c] = math.min(255, (pixels[c] * 255 + alpha ~/ 2) ~/ alpha);
+      }
+    }
+    return StyleImage(
+      width: width,
+      height: height,
+      pixels: straight,
+      pixelRatio: pixelRatio,
+      options: StyleImageOptions(
+        sdf: sdf,
+        stretchX: [for (final stretch in stretchX) (stretch.from, stretch.to)],
+        stretchY: [for (final stretch in stretchY) (stretch.from, stretch.to)],
+        content: switch (content) {
+          null => null,
+          final content => Rect.fromLTRB(
+            content.left,
+            content.top,
+            content.right,
+            content.bottom,
+          ),
+        },
+        textFitWidth: textFitWidth?.toImageTextFit(),
+        textFitHeight: textFitHeight?.toImageTextFit(),
+        keepUnused: keepUnused,
+      ),
+    );
+  }
+}
+
+/// Extension methods for the [mln.StyleImageTextFit] enum.
+extension MlnStyleImageTextFitExt on mln.StyleImageTextFit {
+  /// This fit, or null if this plugin doesn't know it.
+  ImageTextFit? toImageTextFit() => switch (this) {
+    mln.StyleImageTextFit.stretchOrShrink => .stretchOrShrink,
+    mln.StyleImageTextFit.stretchOnly => .stretchOnly,
+    mln.StyleImageTextFit.proportional => .proportional,
+    _ => null,
+  };
 }
 
 /// Extension methods for the [ImageTextFit] enum.

@@ -45,6 +45,11 @@ class MapLibreMapStateNative extends MapLibreMapState {
   CameraPosition? _eventCamera;
 
   var _gestureActive = false;
+
+  /// Whether a released gesture still flings. The map applies gesture deltas
+  /// later than they're sent, so camera changes from the gesture's last moves
+  /// can arrive before its momentum starts. The move ends with the momentum.
+  var _gestureFlinging = false;
   var _cameraMoving = false;
 
   /// The running camera animation, to jump to its target when the map
@@ -130,6 +135,31 @@ class MapLibreMapStateNative extends MapLibreMapState {
         ),
       );
     }
+  }
+
+  /// Runs [MapLibreMap.resolveStyleImage], then calls
+  /// [MapLibreMap.onStyleImageMissing] if the style still lacks the image.
+  Future<void> _onStyleImageMissing(String id) async {
+    final resolve = effectiveWidget.resolveStyleImage;
+    final style = this.style;
+    if (resolve != null && style != null) {
+      try {
+        await resolve(style, id);
+      } on Object catch (error, stack) {
+        FlutterError.reportError(
+          FlutterErrorDetails(
+            exception: error,
+            stack: stack,
+            library: 'maplibre_native',
+            context: ErrorDescription('while resolving the style image "$id"'),
+          ),
+        );
+      }
+      if (_disposed || await style.hasImage(id)) return;
+    }
+    effectiveWidget.onStyleImageMissing?.call(
+      MapEventStyleImageMissing(id: id),
+    );
   }
 
   /// Submits the options, initial camera, and style of a new [map].
@@ -275,6 +305,7 @@ class MapLibreMapStateNative extends MapLibreMapState {
         // transition until its last one ended.
         final snapshot = _map?.getSnapshot();
         if (!_gestureActive &&
+            !_gestureFlinging &&
             snapshot != null &&
             !snapshot.transitionInProgress) {
           _onCameraIdle();
@@ -308,12 +339,10 @@ class MapLibreMapStateNative extends MapLibreMapState {
           const MapEventLoadingFinished(),
         );
       case mln.RuntimeEventType.mapStyleImageMissing:
-        final onStyleImageMissing = effectiveWidget.onStyleImageMissing;
-        if (onStyleImageMissing == null) return;
         if (event.payload case mln.RuntimeEventPayloadStyleImage(
           :final value,
         )) {
-          onStyleImageMissing(MapEventStyleImageMissing(id: value.imageId));
+          unawaited(_onStyleImageMissing(value.imageId));
         }
       case mln.RuntimeEventType.mapTileAction:
         final onTile = effectiveWidget.onTile;
@@ -902,6 +931,7 @@ class _NativeGestureCamera implements GestureCameraSink {
       .._cancelAnimation()
       .._onCameraIdle()
       .._gestureActive = true
+      .._gestureFlinging = false
       .._nextChangeReason = CameraChangeReason.gesture;
     _state._applyDelta(
       const mln.CameraDelta(gesturePhase: mln.GesturePhase.begin),
@@ -943,6 +973,7 @@ class _NativeGestureCamera implements GestureCameraSink {
       return;
     }
     final anchor = velocity.around?.toMln();
+    _state._gestureFlinging = true;
     _state._applyDelta(
       mln.CameraDelta(
         gesturePhase: mln.GesturePhase.end,
@@ -964,7 +995,11 @@ class _NativeGestureCamera implements GestureCameraSink {
         animation: mln.AnimationOptions(
           endHandler: mln.CameraTransitionHandler(
             callback: (_) {
-              if (!_state._gestureActive) _state._onCameraIdle();
+              // A later gesture already took over this fling's move.
+              if (_state._gestureActive) return;
+              _state
+                .._gestureFlinging = false
+                .._onCameraIdle();
             },
           ),
         ),

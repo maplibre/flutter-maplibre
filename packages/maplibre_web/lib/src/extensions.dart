@@ -4,6 +4,7 @@
 library;
 
 import 'dart:js_interop';
+import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 import 'package:maplibre_platform_interface/maplibre_platform_interface.dart';
@@ -109,6 +110,41 @@ extension StyleImageOptionsExt on StyleImageOptions {
             'textFitHeight': ?textFitHeight?.name,
           }.jsify()!
           as interop.StyleImageMetadata;
+}
+
+/// Extension methods for the [interop.StyleImage] class.
+extension JsStyleImageExt on interop.StyleImage {
+  /// This image, with a copy of its pixels.
+  StyleImage toStyleImage() {
+    List<(double, double)> ranges(JSArray<JSArray<JSNumber>>? ranges) => [
+      for (final range in ranges?.toDart ?? const <JSArray<JSNumber>>[])
+        (range.toDart[0].toDartDouble, range.toDart[1].toDartDouble),
+    ];
+    ImageTextFit? fit(String? name) =>
+        ImageTextFit.values.where((fit) => fit.name == name).firstOrNull;
+    final content = this.content?.toDart;
+    return StyleImage(
+      width: data.width,
+      height: data.height,
+      pixels: Uint8List.fromList(data.data.toDart),
+      pixelRatio: pixelRatio.toDouble(),
+      options: StyleImageOptions(
+        sdf: sdf ?? false,
+        stretchX: ranges(stretchX),
+        stretchY: ranges(stretchY),
+        content: content == null || content.length != 4
+            ? null
+            : Rect.fromLTRB(
+                content[0].toDartDouble,
+                content[1].toDartDouble,
+                content[2].toDartDouble,
+                content[3].toDartDouble,
+              ),
+        textFitWidth: fit(textFitWidth),
+        textFitHeight: fit(textFitHeight),
+      ),
+    );
+  }
 }
 
 /// Extension methods for the [interop.PaddingOptions] class.

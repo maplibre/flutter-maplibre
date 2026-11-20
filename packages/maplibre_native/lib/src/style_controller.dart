@@ -395,6 +395,60 @@ class StyleControllerNative extends StyleController
     await _checkUnlessMissing(_map.removeStyleImage(id));
   }
 
+  @override
+  Future<bool> hasImage(String id) async {
+    if (_replaced) return false;
+    return await _map.getStyleImage(id) != null;
+  }
+
+  @override
+  Future<StyleImage?> getImage(String id) async {
+    if (_replaced) return null;
+    return (await _map.getStyleImage(id))?.toStyleImage();
+  }
+
+  @override
+  Future<void> updateImage(String id, Uint8List bytes) async {
+    if (_replaced) return;
+    final image = await _decodeImage(bytes);
+    try {
+      await updateImageFromUiImage(id: id, image: image);
+    } finally {
+      image.dispose();
+    }
+  }
+
+  /// The C API replaces an image of the same id, so this sets it again with
+  /// the pixel ratio and options it has.
+  @override
+  Future<void> updateImageFromUiImage({
+    required String id,
+    required ui.Image image,
+  }) async {
+    if (_replaced) return;
+    final old = await _map.getStyleImage(id);
+    if (old == null) throw StateError('The style has no image "$id".');
+    if (old.width != image.width || old.height != image.height) {
+      throw ArgumentError('The image "$id" is ${old.width} × ${old.height}.');
+    }
+    final pixels = await _premultipliedImage(image, id);
+    if (_replaced) return;
+    await _map.setStyleImage(
+      id,
+      pixels,
+      options: mln.StyleImageOptions(
+        pixelRatio: old.pixelRatio,
+        sdf: old.sdf,
+        stretchX: old.stretchX,
+        stretchY: old.stretchY,
+        content: old.content,
+        textFitWidth: old.textFitWidth,
+        textFitHeight: old.textFitHeight,
+        keepUnused: old.keepUnused,
+      ),
+    );
+  }
+
   /// Removing what the style lacks is not an error on other platforms.
   Future<void> _checkUnlessMissing(
     Future<mln.CommandCompletion> command,

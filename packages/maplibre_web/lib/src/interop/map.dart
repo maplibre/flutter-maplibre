@@ -102,6 +102,28 @@ extension type JsMap._(Camera _) implements Camera {
   /// Remove an image from the map by its id.
   external void removeImage(String id);
 
+  /// Whether the style has the image [id].
+  ///
+  /// https://maplibre.org/maplibre-gl-js/docs/API/classes/Map/#hasimage
+  external bool hasImage(String id);
+
+  /// The image [id] of the style, or null if it has none.
+  ///
+  /// https://maplibre.org/maplibre-gl-js/docs/API/classes/Map/#getimage
+  external StyleImage? getImage(String id);
+
+  /// Replaces the pixels of the image [id] with [image] of the same size.
+  ///
+  /// https://maplibre.org/maplibre-gl-js/docs/API/classes/Map/#updateimage
+  @JS('updateImage')
+  external void updateStyleImage(String id, JSObject image);
+
+  /// Sets the function that the map awaits for a missing image before it
+  /// gives up on it, or removes it with null.
+  ///
+  /// https://maplibre.org/maplibre-gl-js/docs/API/classes/Map/#setmissingstyleimageresolver
+  external void setMissingStyleImageResolver(JSFunction? resolver);
+
   /// Update the min zoom level.
   external void setMinZoom(double? minZoom);
 
@@ -330,6 +352,47 @@ extension type ImageSpecification._(JSObject _) implements JSObject {
     required int height,
     required JSUint8Array data,
   });
+}
+
+/// An image of the style, as [JsMap.getImage] returns it.
+///
+/// https://maplibre.org/maplibre-gl-js/docs/API/type-aliases/StyleImage/
+extension type StyleImage._(JSObject _) implements JSObject {
+  /// The pixels of the image.
+  external RgbaImage get data;
+
+  /// The number of image pixels per logical pixel.
+  external num get pixelRatio;
+
+  /// Whether the image is a signed distance field.
+  external bool? get sdf;
+
+  /// The ranges of x positions that stretch.
+  external JSArray<JSArray<JSNumber>>? get stretchX;
+
+  /// The ranges of y positions that stretch.
+  external JSArray<JSArray<JSNumber>>? get stretchY;
+
+  /// The left, top, right and bottom of the part that text fits into.
+  external JSArray<JSNumber>? get content;
+
+  /// How the image fits the width of the text.
+  external String? get textFitWidth;
+
+  /// How the image fits the height of the text.
+  external String? get textFitHeight;
+}
+
+/// The pixels of a [StyleImage], RGBA8 without premultiplied alpha.
+extension type RgbaImage._(JSObject _) implements JSObject {
+  /// The width in pixels.
+  external int get width;
+
+  /// The height in pixels.
+  external int get height;
+
+  /// The RGBA bytes, row by row from the top.
+  external JSUint8Array get data;
 }
 
 /// The style's image metadata

@@ -10,6 +10,9 @@
   `StyleController.globalState` reads.
 - `StyleController.light` reads and changes the style's light, and
   `StyleController.transition` its default transition.
+- Style images: `StyleController.hasImage`, `getImage`, `updateImage` and
+  `updateImageFromUiImage`, `StyleImageOptions.keepUnused` (not on web), and
+  `MapLibreMap.resolveStyleImage` to add missing images on demand.
 
 ## 0.4.0
 

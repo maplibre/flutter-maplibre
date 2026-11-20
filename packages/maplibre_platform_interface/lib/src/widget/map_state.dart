@@ -841,6 +841,7 @@ abstract class MapLibreMapState extends State<MapLibreMap>
         app.onStyleImageMissing,
         (p) => p.onStyleImageMissing,
       ),
+      resolveStyleImage: app.resolveStyleImage,
       onLoadingStarted: _toAll(app.onLoadingStarted, (p) => p.onLoadingStarted),
       onLoadingFinished: _toAll(
         app.onLoadingFinished,

@@ -18,6 +18,7 @@ import 'package:maplibre_example/offline_page.dart';
 import 'package:maplibre_example/parameters_page.dart';
 import 'package:maplibre_example/paused_rendering_page.dart';
 import 'package:maplibre_example/pmtiles_page.dart';
+import 'package:maplibre_example/style_images_page.dart';
 import 'package:maplibre_example/style_layers_circle_page.dart';
 import 'package:maplibre_example/style_layers_fill_extrusion_page.dart';
 import 'package:maplibre_example/style_layers_fill_page.dart';
@@ -74,6 +75,7 @@ class MyApp extends StatelessWidget {
         OfflinePage.location: (context) => const OfflinePage(),
         StyleLayersSymbolPage.location: (context) =>
             const StyleLayersSymbolPage(),
+        StyleImagesPage.location: (context) => const StyleImagesPage(),
         StyleLayersCirclePage.location: (context) =>
             const StyleLayersCirclePage(),
         StyleLayersHeatmapPage.location: (context) =>

@@ -156,6 +156,61 @@ class StyleControllerWeb extends StyleController
   }
 
   @override
+  Future<bool> hasImage(String id) async => !_replaced && _map.hasImage(id);
+
+  @override
+  Future<StyleImage?> getImage(String id) async =>
+      _replaced ? null : _map.getImage(id)?.toStyleImage();
+
+  @override
+  Future<void> updateImage(String id, Uint8List bytes) async {
+    if (_replaced) return;
+    final blob = Blob([bytes.toJS].toJS);
+    final bitmap = await window.createImageBitmap(blob).toDart;
+    try {
+      if (_replaced) return;
+      _checkUpdate(id, bitmap.width, bitmap.height);
+      // gl-js copies the pixels of the bitmap.
+      _map.updateStyleImage(id, bitmap);
+    } finally {
+      bitmap.close();
+    }
+  }
+
+  @override
+  Future<void> updateImageFromUiImage({
+    required String id,
+    required ui.Image image,
+  }) async {
+    if (_replaced) return;
+    final data = await image.toByteData(
+      format: ImageByteFormat.rawStraightRgba,
+    );
+    if (data == null) {
+      throw StateError('Failed to read the pixels of the image "$id".');
+    }
+    if (_replaced) return;
+    _checkUpdate(id, image.width, image.height);
+    _map.updateStyleImage(
+      id,
+      interop.ImageSpecification(
+        width: image.width,
+        height: image.height,
+        data: Uint8List.sublistView(data).toJS,
+      ),
+    );
+  }
+
+  /// Throws like native maps, as gl-js only fires an error event.
+  void _checkUpdate(String id, int width, int height) {
+    final old = _map.getImage(id)?.data;
+    if (old == null) throw StateError('The style has no image "$id".');
+    if (old.width != width || old.height != height) {
+      throw ArgumentError('The image "$id" is ${old.width} × ${old.height}.');
+    }
+  }
+
+  @override
   Future<void> addLayer(
     Map<String, Object?> json, {
     String? belowLayerId,

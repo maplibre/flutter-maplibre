@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
@@ -333,6 +334,32 @@ abstract class StyleController implements Listenable {
   /// Removes an image from the map
   Future<void> removeImage(String id);
 
+  /// Whether the style has the image [id], from its sprite or added with
+  /// [addImage] and the other `addImage…` methods.
+  Future<bool> hasImage(String id);
+
+  /// Reads the image [id] of the style, from its sprite or added with
+  /// [addImage] and the other `addImage…` methods, or null if the style has
+  /// no such image.
+  Future<StyleImage?> getImage(String id);
+
+  /// Replaces the pixels of the image [id] with the encoded image [bytes],
+  /// for example the next frame of an animated icon. The image keeps its
+  /// pixel ratio and [StyleImageOptions].
+  ///
+  /// The new image must have the size of the old one. Throws a [StateError]
+  /// if the style has no image [id], and an [ArgumentError] if the size
+  /// differs. Use [addImage] for a new image or one of another size.
+  Future<void> updateImage(String id, Uint8List bytes);
+
+  /// Like [updateImage], but with the pixels of a
+  /// [dart:ui Image](Image), which go to the map without an encoding to PNG.
+  /// The caller keeps [image] and disposes it.
+  Future<void> updateImageFromUiImage({
+    required String id,
+    required Image image,
+  });
+
   /// Sets the projection of the map, a [MapProjection] or an expression that
   /// changes it with the zoom level.
   ///
@@ -426,6 +453,7 @@ final class StyleImageOptions {
     this.content,
     this.textFitWidth,
     this.textFitHeight,
+    this.keepUnused = false,
   });
 
   /// Whether the image is a signed distance field, whose color
@@ -449,6 +477,14 @@ final class StyleImageOptions {
   /// How the image fits the height of the text.
   final ImageTextFit? textFitHeight;
 
+  /// Whether the map keeps the image while no layer of the style uses it.
+  /// Off, the map may remove an image that was added after the map reported
+  /// it missing, see [MapLibreMap.onStyleImageMissing], once no layer uses
+  /// it.
+  ///
+  /// Not on web, where the map always keeps its images.
+  final bool keepUnused;
+
   /// These options with every position multiplied by [factor].
   StyleImageOptions scaled(double factor) => factor == 1
       ? this
@@ -466,6 +502,7 @@ final class StyleImageOptions {
                 ),
           textFitWidth: textFitWidth,
           textFitHeight: textFitHeight,
+          keepUnused: keepUnused,
         );
 
   @override
@@ -476,7 +513,8 @@ final class StyleImageOptions {
       listEquals(stretchY, other.stretchY) &&
       content == other.content &&
       textFitWidth == other.textFitWidth &&
-      textFitHeight == other.textFitHeight;
+      textFitHeight == other.textFitHeight &&
+      keepUnused == other.keepUnused;
 
   @override
   int get hashCode => Object.hash(
@@ -486,5 +524,47 @@ final class StyleImageOptions {
     content,
     textFitWidth,
     textFitHeight,
+    keepUnused,
   );
 }
+
+/// An image of the style, as [StyleController.getImage] reads it.
+///
+/// {@category Basic}
+@immutable
+final class StyleImage {
+  /// Creates an image of [width] × [height] [pixels].
+  const StyleImage({
+    required this.width,
+    required this.height,
+    required this.pixels,
+    this.pixelRatio = 1,
+    this.options = const StyleImageOptions(),
+  });
+
+  /// The width of the image in pixels.
+  final int width;
+
+  /// The height of the image in pixels.
+  final int height;
+
+  /// The pixels of the image as RGBA bytes without premultiplied alpha, in
+  /// rows of [width] * 4 bytes from the top row down.
+  final Uint8List pixels;
+
+  /// The number of image pixels per logical pixel, see
+  /// [StyleController.addImage].
+  final double pixelRatio;
+
+  /// How the map draws the image.
+  final StyleImageOptions options;
+}
+
+/// Resolves the image [id] that a layer of [style] uses but the style
+/// doesn't have, usually by adding it with [StyleController.addImage].
+///
+/// See [MapLibreMap.resolveStyleImage].
+typedef StyleImageResolver = FutureOr<void> Function(
+  StyleController style,
+  String id,
+);

@@ -81,3 +81,6 @@
 - Touch tilt and double-tap-drag are not tested on Windows touchscreens.
 - Web lost gl-js's keyboard navigation and shift-drag box zoom, which the
   shared recognizer doesn't offer, and its grab cursor.
+- No call lists the images of a style, so there is no `listImages`. The
+  missing-image event arrives after the frame was drawn without the image,
+  so `resolveStyleImage` adds it a frame late on native.

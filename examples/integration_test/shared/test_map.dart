@@ -294,6 +294,7 @@ Future<TestMap> pumpMap(
   List<Widget> children = const [],
   bool paused = false,
   CameraPosition? camera,
+  StyleImageResolver? resolveStyleImage,
 }) async {
   final events = <MapEvent>[];
   final lifecycle = <MapLifecycle>[];
@@ -312,6 +313,7 @@ Future<TestMap> pumpMap(
       if (!style.isCompleted) style.complete(style_);
     },
     onEvent: events.add,
+    resolveStyleImage: resolveStyleImage,
     paused: paused,
     children: children,
   );
@@ -359,6 +361,7 @@ class MapApp extends StatelessWidget {
     this.onStyleLoaded,
     this.onEvent,
     this.onRenderFrame,
+    this.resolveStyleImage,
     this.children = const [],
     this.paused = false,
     super.key,
@@ -371,6 +374,7 @@ class MapApp extends StatelessWidget {
   final StyleLoadedCallback? onStyleLoaded;
   final void Function(MapEvent event)? onEvent;
   final MapEventCallback<MapEventRenderFrame>? onRenderFrame;
+  final StyleImageResolver? resolveStyleImage;
   final List<Widget> children;
   final bool paused;
 
@@ -399,6 +403,7 @@ class MapApp extends StatelessWidget {
           onIdle: onEvent,
           onError: onEvent,
           onStyleImageMissing: onEvent,
+          resolveStyleImage: resolveStyleImage,
           onLoadingStarted: onEvent,
           onLoadingFinished: onEvent,
           onSourceChanged: onEvent,
@@ -432,6 +437,7 @@ class MapApp extends StatelessWidget {
           onIdle: onEvent,
           onError: onEvent,
           onStyleImageMissing: onEvent,
+          resolveStyleImage: resolveStyleImage,
           onLoadingStarted: onEvent,
           onLoadingFinished: onEvent,
           onSourceChanged: onEvent,

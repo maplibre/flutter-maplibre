@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -670,6 +671,175 @@ void runTests() {
       );
     });
 
+    testWidgets('reads images back', (tester) async {
+      final map = await pumpMap(tester, options: offlineOptions());
+      final red = await _solidImage(const Color(0xFFFF0000));
+      addTearDown(red.dispose);
+      const options = StyleImageOptions(
+        stretchX: [(4, 8)],
+        stretchY: [(2, 6)],
+        content: Rect.fromLTRB(2, 2, 10, 10),
+        textFitWidth: .stretchOnly,
+        keepUnused: true,
+      );
+      await map.style.addImageFromUiImage(
+        id: 'square',
+        image: red,
+        pixelRatio: 2,
+        options: options,
+      );
+      expect(await map.style.hasImage('square'), isTrue);
+      expect(await map.style.hasImage('none'), isFalse);
+      expect(await map.style.getImage('none'), isNull);
+
+      final image = (await map.style.getImage('square'))!;
+      expect((image.width, image.height), (32, 32));
+      expect(image.pixelRatio, 2);
+      // Web always keeps its images.
+      expect(
+        image.options,
+        kIsWeb
+            ? const StyleImageOptions(
+                stretchX: [(4, 8)],
+                stretchY: [(2, 6)],
+                content: Rect.fromLTRB(2, 2, 10, 10),
+                textFitWidth: .stretchOnly,
+              )
+            : options,
+      );
+      expect(image.pixels.sublist(0, 4), [255, 0, 0, 255]);
+
+      // Straight alpha on every platform, although native keeps the pixels
+      // premultiplied.
+      final translucent = await _solidImage(const Color(0x80FF0000), size: 4);
+      addTearDown(translucent.dispose);
+      await map.style.addImageFromUiImage(id: 'half', image: translucent);
+      final half = (await map.style.getImage('half'))!;
+      expect(half.pixels[0], inInclusiveRange(253, 255));
+      expect(half.pixels.sublist(1, 4), [0, 0, 128]);
+    });
+
+    testWidgets('updates the pixels of an image', (tester) async {
+      final map = await pumpMap(tester, options: offlineOptions());
+      final red = await _solidImage(const Color(0xFFFF0000));
+      addTearDown(red.dispose);
+      await map.style.addImageFromUiImage(
+        id: 'square',
+        image: red,
+        pixelRatio: 2,
+      );
+      await map.style.sources.add(
+        GeoJsonSource.data(id: 'src', data: _pointData()),
+      );
+      await map.style.layers.add(
+        SymbolStyleLayer(
+          id: 'square',
+          sourceId: 'src',
+          iconImage: const .literal('square'),
+        ),
+      );
+      await map.waitForFeatures(
+        map.center,
+        (features) => features.any((f) => f.layerId == 'square'),
+      );
+      if (!kIsWeb) await map.waitForColorAtCenter('red', 0);
+
+      final green = await _solidImage(const Color(0xFF00FF00));
+      addTearDown(green.dispose);
+      await map.style.updateImageFromUiImage(id: 'square', image: green);
+      final updated = (await map.style.getImage('square'))!;
+      expect(updated.pixels.sublist(0, 4), [0, 255, 0, 255]);
+      expect(updated.pixelRatio, 2);
+      expect(updated.options, const StyleImageOptions());
+      if (!kIsWeb) await map.waitForColorAtCenter('green', 1);
+
+      final blue = await _solidImage(const Color(0xFF0000FF));
+      final png = await blue.toByteData(format: ui.ImageByteFormat.png);
+      blue.dispose();
+      await map.style.updateImage('square', Uint8List.sublistView(png!));
+      final fromBytes = (await map.style.getImage('square'))!;
+      expect(fromBytes.pixels.sublist(0, 4), [0, 0, 255, 255]);
+
+      final small = await _solidImage(const Color(0xFF00FF00), size: 16);
+      addTearDown(small.dispose);
+      await expectLater(
+        map.style.updateImageFromUiImage(id: 'square', image: small),
+        throwsArgumentError,
+      );
+      await expectLater(
+        map.style.updateImageFromUiImage(id: 'none', image: green),
+        throwsStateError,
+      );
+    });
+
+    testWidgets('resolves missing images before it reports them', (
+      tester,
+    ) async {
+      final requested = <String>[];
+      final map = await pumpMap(
+        tester,
+        options: offlineOptions(),
+        resolveStyleImage: (style, id) async {
+          requested.add(id);
+          if (id == 'failing') throw StateError('No image $id');
+          if (id != 'resolved') return;
+          // The image comes later, as from the network.
+          await Future<void>.delayed(const Duration(milliseconds: 100));
+          final image = await _solidImage(const Color(0xFF00FF00));
+          try {
+            await style.addImageFromUiImage(id: id, image: image);
+          } finally {
+            image.dispose();
+          }
+        },
+      );
+      await map.style.sources.add(
+        GeoJsonSource.data(id: 'src', data: _pointData()),
+      );
+      final since = map.events.length;
+      await map.style.layers.add(
+        SymbolStyleLayer(
+          id: 'resolved',
+          sourceId: 'src',
+          iconImage: const .literal('resolved'),
+        ),
+      );
+      await map.waitForFeatures(
+        map.center,
+        (features) => features.any((f) => f.layerId == 'resolved'),
+      );
+      if (!kIsWeb) await map.waitForColorAtCenter('green', 1);
+      expect(requested, contains('resolved'));
+
+      await map.style.layers.add(
+        SymbolStyleLayer(
+          id: 'unresolved',
+          sourceId: 'src',
+          iconImage: const .literal('unresolved'),
+        ),
+      );
+      final missing = await map.waitForEvent<MapEventStyleImageMissing>(
+        since: since,
+      );
+      expect(missing.id, 'unresolved');
+      expect(requested, contains('unresolved'));
+
+      // A resolver that fails is reported, and the image is still missing.
+      final beforeFailing = map.events.length;
+      await map.style.layers.add(
+        SymbolStyleLayer(
+          id: 'failing',
+          sourceId: 'src',
+          iconImage: const .literal('failing'),
+        ),
+      );
+      await map.waitForEvent<MapEventStyleImageMissing>(
+        since: beforeFailing,
+        where: (event) => event.id == 'failing',
+      );
+      expect(tester.takeException(), isA<StateError>());
+    });
+
     testWidgets('a batch applies its changes', (tester) async {
       final map = await pumpMap(tester, options: offlineOptions(zoom: 8));
       await map.style.sources.add(
@@ -1233,6 +1403,16 @@ void runTests() {
 }
 
 const _markerAsset = 'assets/images/marker.png';
+
+/// An image of [size] × [size] pixels in [color].
+Future<ui.Image> _solidImage(Color color, {int size = 32}) {
+  final recorder = ui.PictureRecorder();
+  Canvas(recorder).drawColor(color, BlendMode.src);
+  final picture = recorder.endRecording();
+  final image = picture.toImage(size, size);
+  picture.dispose();
+  return image;
+}
 
 /// A layer of an icon that hides the icons of the layers below it: symbols
 /// are placed from the top layer down, and those that collide are not shown.

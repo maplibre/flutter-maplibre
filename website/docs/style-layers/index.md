@@ -240,6 +240,28 @@ await style.layers.add(
 See the
 [example app](https://github.com/maplibre/flutter-maplibre/blob/main/examples/lib/style_layers_symbol_page.dart).
 
+### Style images
+
+`hasImage` and `getImage` read an image of the style, from its sprite or
+added with `addImage`. `updateImage` and `updateImageFromUiImage` replace the
+pixels of an image of the same size, for example to animate an icon.
+`StyleImageOptions(keepUnused: true)` keeps an image that no layer uses (not
+on web).
+
+`MapLibreMap.resolveStyleImage` adds images when a layer first needs them:
+
+```dart
+MapLibreMap(
+  resolveStyleImage: (style, id) async {
+    final response = await http.get(Uri.parse('$iconsUrl/$id.png'));
+    await style.addImage(id, response.bodyBytes);
+  },
+);
+```
+
+Not on web, the icon shows a frame later. See the
+[example app](https://github.com/maplibre/flutter-maplibre/blob/main/examples/lib/style_images_page.dart).
+
 ## Background
 
 A `BackgroundStyleLayer` fills the whole map with a color or a pattern. It
