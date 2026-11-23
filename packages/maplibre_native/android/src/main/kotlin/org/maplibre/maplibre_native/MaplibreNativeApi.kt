@@ -42,7 +42,7 @@ object MaplibreNativeApi {
 
     internal fun detach(engineId: Long) {
         val engine = engines.remove(engineId) ?: return
-        for (producer in engine.producers.values) producer.release()
+        for (producer in engine.producers.values) release(producer)
         engine.producers.clear()
     }
 
@@ -118,6 +118,17 @@ object MaplibreNativeApi {
         engineId: Long,
         textureId: Long,
     ) {
-        engines[engineId]?.producers?.remove(textureId)?.release()
+        engines[engineId]?.producers?.remove(textureId)?.let(::release)
+    }
+
+    /**
+     * Releases [producer] and lets go of its callback first. The callback
+     * holds the Dart listener's proxy, and the listener's Dart side lives until
+     * the proxy is collected, which a callback left on the producer delays for
+     * as long as Flutter keeps the producer.
+     */
+    private fun release(producer: TextureRegistry.SurfaceProducer) {
+        producer.setCallback(null)
+        producer.release()
     }
 }
