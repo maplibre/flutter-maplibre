@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'dart:math';
-import 'dart:typed_data' show Uint8ClampedList;
+import 'dart:typed_data' show Uint8ClampedList, Uint8List;
 import 'dart:ui';
 import 'dart:ui' as ui;
 import 'dart:ui_web';
@@ -330,6 +330,65 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
             ),
           ),
     );
+  }
+
+  /// Draws a frame and reads the canvas it was drawn in, scaled when
+  /// another pixel ratio was asked for.
+  @override
+  Future<Uint8List?> takeSnapshot({double? pixelRatio}) async {
+    assert(
+      pixelRatio == null || (pixelRatio > 0 && pixelRatio.isFinite),
+      'pixelRatio must be finite and > 0',
+    );
+    if (!mounted || !_mapCreated) return null;
+    // context.size throws for a map that has yet to be laid out, which a
+    // map that is built off screen has not been.
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.hasSize || box.size.isEmpty) return null;
+    final size = box.size;
+    final ratio = pixelRatio ?? MediaQuery.devicePixelRatioOf(context);
+    // The same size as a capture of the map's layer on the other platforms.
+    final width = (size.width * ratio).ceil();
+    final height = (size.height * ratio).ceil();
+    // The browser clears the canvas of the map once it has shown the frame,
+    // so the map draws one here and the pixels are copied below, in the same
+    // task: an await before the copy would read a canvas that was cleared.
+    // A capture from MapLibreMap.onRenderFrame already runs in the task of
+    // a frame, and drawing one there would report it and call back here.
+    if (!_reportingFrame) _map.redraw();
+    final canvas = _map.getCanvas();
+    // The canvas has the resolution the browser draws the map in, so it is
+    // scaled for another pixel ratio.
+    if (width == canvas.width && height == canvas.height) return _png(canvas);
+    final scaled = (document.createElement('canvas') as HTMLCanvasElement)
+      ..width = width
+      ..height = height;
+    (scaled.getContext('2d')! as CanvasRenderingContext2D).drawImage(
+      canvas,
+      0,
+      0,
+      width,
+      height,
+    );
+    final png = await _png(scaled);
+    // Releases the pixels of the canvas now rather than at a collection.
+    scaled
+      ..width = 0
+      ..height = 0;
+    return png;
+  }
+
+  /// The pixels of [canvas], encoded as a PNG image. `toBlob` copies them
+  /// when it is called and encodes them off the main thread, where
+  /// `toDataURL` would encode on it and go through base64.
+  static Future<Uint8List?> _png(HTMLCanvasElement canvas) async {
+    final encoded = Completer<Blob?>();
+    void onEncoded(Blob? blob) => encoded.complete(blob);
+    canvas.toBlob(onEncoded.toJS, 'image/png');
+    final blob = await encoded.future;
+    if (blob == null) return null;
+    final buffer = await blob.arrayBuffer().toDart;
+    return buffer.toDart.asUint8List();
   }
 
   @override
@@ -873,12 +932,21 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
   /// is only registered while [MapLibreMap.onRenderFrame] is set.
   JSExportedDartFunction? _renderListener;
 
+  /// Whether the map is reporting a frame it just drew, during which
+  /// [takeSnapshot] reads the canvas of that frame.
+  var _reportingFrame = false;
+
   void _updateRenderListener() {
     final listens = effectiveWidget.onRenderFrame != null;
     if (listens == (_renderListener != null)) return;
     if (listens) {
       final listener = (interop.MapLibreEvent event) {
-        effectiveWidget.onRenderFrame?.call(const MapEventRenderFrame());
+        _reportingFrame = true;
+        try {
+          effectiveWidget.onRenderFrame?.call(const MapEventRenderFrame());
+        } finally {
+          _reportingFrame = false;
+        }
       }.toJS;
       _renderListener = listener;
       _map.on(interop.MapEventType.render, listener);

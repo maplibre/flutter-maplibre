@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/widgets.dart';
 import 'package:maplibre_platform_interface/maplibre_platform_interface.dart';
 import 'package:maplibre_platform_interface/src/widget/inherited_model.dart';
@@ -169,4 +171,29 @@ abstract interface class MapController {
   ///
   /// Not on web, where it has no effect.
   Future<void> dumpDebugLogs();
+
+  /// Captures the map as it is shown, encoded as a PNG image.
+  ///
+  /// The image holds the map alone: the widgets of [MapLibreMap.children]
+  /// are drawn over it and are not part of it. Its size is the size of the
+  /// map in logical pixels, multiplied by [pixelRatio] and rounded up to
+  /// whole pixels. [pixelRatio] must be greater than zero and defaults to
+  /// the device pixel ratio, so a capture has the resolution of the screen.
+  ///
+  /// Use it to save the map on its own, and on web also to capture it from
+  /// Flutter at all: the map draws outside the Flutter tree there, so a
+  /// capture of that tree leaves it out.
+  ///
+  /// The map must have drawn a frame, which it has not right after it was
+  /// created: wait for [MapLibreMap.onRenderFrame] before capturing from
+  /// [MapLibreMap.onMapCreated] or [MapLibreMap.onStyleLoaded], or the
+  /// capture shows an empty map. The capture holds the frame that the map
+  /// last showed, except on web, where the map draws the frame of the
+  /// capture, so a change the map has yet to show is in a capture on web
+  /// alone.
+  ///
+  /// Returns null while the map has no size, on web until the map is
+  /// created, on every other platform until it has painted, once the map
+  /// was disposed, and where the platform fails to encode the image.
+  Future<Uint8List?> takeSnapshot({double? pixelRatio});
 }

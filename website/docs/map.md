@@ -242,3 +242,30 @@ MapLibreMap(
 `MapController.isRenderingPaused` and the `onRenderingChanged` callback tell
 whether the map renders. On web, the browser already skips hidden maps, so
 `paused` has no effect there.
+
+## Capture the map
+
+`MapController.takeSnapshot()` captures the map as it is shown, encoded as a
+PNG image. The capture covers the map itself: the widgets of
+`MapLibreMap.children` are drawn over it and are not part of it. Use it to
+save the map on its own, and on web also to capture it from Flutter at all,
+since the map draws outside the Flutter tree there and a capture of that tree
+leaves it out:
+
+```dart
+final png = await controller.takeSnapshot();
+```
+
+The image is the size of the map in logical pixels multiplied by
+`pixelRatio`, rounded up to whole pixels. `pixelRatio` must be greater than
+zero and defaults to the device pixel ratio, so the capture has the
+resolution of the screen.
+
+The map must have drawn a frame, which it has not right after it was created:
+wait for `onRenderFrame` before capturing from `onMapCreated` or
+`onStyleLoaded`, or the capture shows an empty map. The capture holds the
+frame that the map last showed, except on web, where the map draws the frame
+of the capture.
+
+The call returns null while the map has no size, on web until the map is
+created, and on every other platform until it has painted.

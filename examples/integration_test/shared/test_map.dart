@@ -296,6 +296,7 @@ Future<TestMap> pumpMap(
   List<Widget> children = const [],
   bool paused = false,
   CameraPosition? camera,
+  MapEventCallback<MapEventRenderFrame>? onRenderFrame,
 }) async {
   final events = <MapEvent>[];
   final lifecycle = <MapLifecycle>[];
@@ -314,6 +315,7 @@ Future<TestMap> pumpMap(
       if (!style.isCompleted) style.complete(style_);
     },
     onEvent: events.add,
+    onRenderFrame: onRenderFrame,
     paused: paused,
     children: children,
   );

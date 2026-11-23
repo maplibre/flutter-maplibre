@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -309,6 +310,145 @@ void runTests() {
       await tester.pump(const Duration(milliseconds: 200));
       expect(left.getCamera().zoom, closeTo(6, 1e-6));
       expect(right.getCamera().zoom, closeTo(4, 1e-6));
+    });
+
+    testWidgets('captures the map from a frame callback', (tester) async {
+      MapController? controller;
+      Future<Uint8List?>? captured;
+      final map = await pumpMap(
+        tester,
+        // A capture draws a frame on web, where a frame is reported here,
+        // so a capture must not draw a frame of its own from this callback.
+        onRenderFrame: (_) {
+          if (controller == null || captured != null) return;
+          captured = controller.takeSnapshot(pixelRatio: 1);
+        },
+      );
+      controller = map.controller;
+      // A frame of the map, which the native platforms only render once
+      // something changed.
+      await controller.moveCamera(const CameraUpdate.position(zoom: 3));
+      await map.pumpUntil(
+        () => captured != null,
+        reason: () => 'the map never reported a frame',
+      );
+      expect(
+        await map.pumpFuture(captured!, reason: 'capturing from a frame'),
+        isNotNull,
+      );
+    });
+
+    testWidgets('captures the map it shows', (tester) async {
+      String background(String color) => jsonEncode({
+        'version': 8,
+        'sources': <String, Object>{},
+        'layers': [
+          {
+            'id': 'background',
+            'type': 'background',
+            'paint': {'background-color': color},
+          },
+        ],
+      });
+      final map = await pumpMap(
+        tester,
+        options: MapOptions(style: MapStyle.json(background('#00ff00'))),
+        // Covers the middle of the map, and must not reach the capture.
+        children: const [
+          Center(
+            child: ColoredBox(
+              color: Color(0xffff0000),
+              child: SizedBox.square(dimension: 64),
+            ),
+          ),
+        ],
+      );
+      await map.waitForLatestFrame();
+
+      Future<ui.Image> capture({double? pixelRatio}) async {
+        final png = await map.pumpFuture(
+          map.controller.takeSnapshot(pixelRatio: pixelRatio),
+          reason: 'capturing the map',
+        );
+        expect(png, isNotNull);
+        return decodeImageFromList(png!);
+      }
+
+      // The RGBA color at the center of a capture.
+      Future<List<int>> centerOf(ui.Image image) async {
+        final pixels = await image.toByteData();
+        final middle =
+            ((image.height ~/ 2) * image.width + image.width ~/ 2) * 4;
+        return Uint8List.sublistView(pixels!, middle, middle + 4).toList();
+      }
+
+      // Browsers convert the colors of a canvas they read, so the channels
+      // of a capture are not compared exactly.
+      bool shows(List<int> center, List<int> rgb) =>
+          center[3] == 0xff &&
+          Iterable.generate(
+            3,
+            (i) => (center[i] - rgb[i]).abs() <= 2,
+          ).every((ok) => ok);
+
+      // Outside web, a capture holds the frame the map last showed, which a
+      // frame it just rendered only reaches a few frames later, so the map
+      // is captured until a capture shows the background of its style.
+      Future<ui.Image> captureUntil(List<int> rgb) async {
+        final deadline = DateTime.now().add(defaultTimeout);
+        ui.Image? image;
+        while (true) {
+          image?.dispose();
+          image = await capture(pixelRatio: 1);
+          final center = await centerOf(image);
+          if (shows(center, rgb)) return image;
+          if (DateTime.now().isAfter(deadline)) {
+            final shown = kIsWeb
+                ? 'the map on screen cannot be read on web'
+                : 'the map on screen showed ${await map.pixelAtCenter()}';
+            image.dispose();
+            fail(
+              'The capture never showed $rgb at the center of the map, '
+              'last: $center, while $shown',
+            );
+          }
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+      }
+
+      // The background of the style, under the widget over the map, which
+      // the capture leaves out.
+      final image = await captureUntil([0, 0xff, 0]);
+      addTearDown(image.dispose);
+      // A capture rounds the size up to the next whole pixel.
+      expect(image.width, map.size.width.ceil());
+      expect(image.height, map.size.height.ceil());
+
+      // A capture scales with the pixel ratio asked for, whatever ratio the
+      // map renders in.
+      final larger = await capture(pixelRatio: 2);
+      addTearDown(larger.dispose);
+      expect(larger.width, (map.size.width * 2).ceil());
+      expect(larger.height, (map.size.height * 2).ceil());
+      final scaled = await centerOf(larger);
+      expect(
+        shows(scaled, [0, 0xff, 0]),
+        isTrue,
+        reason: 'the capture at twice the resolution showed $scaled',
+      );
+
+      // Without a ratio, a capture has the resolution of the screen.
+      final screen = await capture();
+      addTearDown(screen.dispose);
+      final ratio = tester.view.devicePixelRatio;
+      expect(screen.width, (map.size.width * ratio).ceil());
+      expect(screen.height, (map.size.height * ratio).ceil());
+
+      // A capture shows the map as it is, not a frame it showed before.
+      await map.setOptions(
+        MapOptions(style: MapStyle.json(background('#0000ff'))),
+      );
+      (await captureUntil([0, 0, 0xff])).dispose();
     });
   });
 }
