@@ -14,15 +14,22 @@ FrameTarget createAndroidTarget(LogicalExtent extent) {
 final class _SurfaceTarget extends FrameTarget {
   _SurfaceTarget(LogicalExtent extent) {
     final (width, height) = physicalSize(extent);
+    final callbacks = _callbacks;
     _texture = AndroidPlugin.createSurfaceTexture(
       width,
       height,
-      onSurfaceAvailable: _onSurfaceAvailable,
-      onSurfaceCleanup: _onSurfaceCleanup,
+      onSurfaceAvailable: () => callbacks.target?._onSurfaceAvailable(),
+      onSurfaceCleanup: () => callbacks.target?._onSurfaceCleanup(),
     );
   }
 
   late final SurfaceTexture _texture;
+
+  /// What the texture's listener reaches this target through, cleared by
+  /// [dispose]. The listener's Dart side lives until the Java VM collects its
+  /// proxy, so a listener holding the target itself kept the target, its
+  /// host and the whole map state alive after the map was gone.
+  late final _callbacks = _SurfaceCallbacks(this);
 
   RenderSessionHandle? _session;
 
@@ -113,5 +120,15 @@ final class _SurfaceTarget extends FrameTarget {
 
   /// The session closed, so nothing presents to the surface anymore.
   @override
-  void dispose() => AndroidPlugin.disposeTexture(_texture);
+  void dispose() {
+    _callbacks.target = null;
+    AndroidPlugin.disposeTexture(_texture);
+  }
+}
+
+/// The target that a texture's listener calls, until it is disposed.
+final class _SurfaceCallbacks {
+  _SurfaceCallbacks(this.target);
+
+  _SurfaceTarget? target;
 }

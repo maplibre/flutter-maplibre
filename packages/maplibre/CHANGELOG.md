@@ -14,6 +14,11 @@
   overdraw and rendering stats, `MapLibreLog.onMessage` receives the map log
   (not on web) and `MapController.dumpDebugLogs` logs the map state.
 
+### Bug Fixes
+
+- Android: the listener of a disposed map's texture no longer keeps the
+  map's state reachable, one more for every map created and disposed.
+
 ## 0.4.0
 
 `maplibre` is now a MapLibre
