@@ -146,6 +146,7 @@ class MapLibreMapStateNative extends MapLibreMapState {
     // style once it loads, but only while no camera change happened. Setting
     // camera constraints is one, so they follow the first style.
     _constraintsAfterStyle = initCamera == null;
+    _applyDebugOverlays(map, options.debugOverlays, const .none());
     await Future.wait([
       if (initCamera != null) ...[
         _applyOptions(),
@@ -183,6 +184,19 @@ class MapLibreMapStateNative extends MapLibreMapState {
     );
   }
 
+  /// Submits the debug overlays that differ from [previous].
+  void _applyDebugOverlays(
+    mln.MapHandle map,
+    MapDebugOverlays overlays,
+    MapDebugOverlays previous,
+  ) {
+    final flags = overlays.toMln();
+    if (flags != previous.toMln()) map.discarding.setDebugFlags(flags);
+    if (overlays.renderingStats != previous.renderingStats) {
+      map.discarding.setRenderingStatsViewEnabled(overlays.renderingStats);
+    }
+  }
+
   @override
   void setRenderingPaused({required bool paused}) {
     _renderer?.paused = paused;
@@ -199,6 +213,13 @@ class MapLibreMapStateNative extends MapLibreMapState {
   void didUpdateWidget(covariant MapLibreMap oldWidget) {
     final options = widget.options;
     if (oldWidget.options != options) unawaited(_applyOptions());
+    if (_map case final map?) {
+      _applyDebugOverlays(
+        map,
+        options.debugOverlays,
+        oldWidget.options.debugOverlays,
+      );
+    }
     if (oldWidget.options.style != options.style) {
       unawaited(_setStyle(options.style));
     } else if (oldWidget.options.globalState != options.globalState) {
@@ -599,6 +620,13 @@ class MapLibreMapStateNative extends MapLibreMapState {
   }) async => _clusterFeatures(
     await _session?.getClusterLeaves(sourceId, clusterId, limit, offset),
   );
+
+  @override
+  Future<void> dumpDebugLogs() async {
+    final map = _map;
+    if (_disposed || map == null) return;
+    await Future.wait([map.dumpDebugLogs(), ?_session?.dumpDebugLogs()]);
+  }
 
   /// The render session that answers cluster queries, or null once the map
   /// is disposed.

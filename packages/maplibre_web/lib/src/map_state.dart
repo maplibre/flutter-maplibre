@@ -143,6 +143,7 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
       _map.setMinPitch(options.minPitch);
       _map.setMaxPitch(options.maxPitch);
       _map.setMaxBounds(options.maxBounds?.toJs());
+      _applyDebugOverlays(options.debugOverlays, const .none());
       // Without an initial camera, the map takes the style's camera once it
       // loads.
       if (initialCamera case final initCamera?) {
@@ -436,12 +437,30 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
     if (options.maxBounds != oldWidget.options.maxBounds) {
       _map.setMaxBounds(options.maxBounds?.toJs());
     }
+    _applyDebugOverlays(options.debugOverlays, oldWidget.options.debugOverlays);
     if (options.style != oldWidget.options.style) {
       _setStyle(options.style);
     } else if (options.globalState != oldWidget.options.globalState) {
       style?.applyGlobalState(options.globalState);
     }
     super.didUpdateWidget(oldWidget);
+  }
+
+  /// Sets the debug overlays that differ from [previous]. gl-js has no
+  /// rendering stats overlay.
+  void _applyDebugOverlays(
+    MapDebugOverlays overlays,
+    MapDebugOverlays previous,
+  ) {
+    if (overlays.tileBorders != previous.tileBorders) {
+      _map.showTileBoundaries = overlays.tileBorders;
+    }
+    if (overlays.collisionBoxes != previous.collisionBoxes) {
+      _map.showCollisionBoxes = overlays.collisionBoxes;
+    }
+    if (overlays.overdraw != previous.overdraw) {
+      _map.showOverdrawInspector = overlays.overdraw;
+    }
   }
 
   @override
@@ -772,6 +791,10 @@ final class MapLibreMapStateWeb extends MapLibreMapState {
         .toDart;
     return [for (final f in leaves.toDart) f.toSourceFeature()];
   }
+
+  /// gl-js logs no internal state.
+  @override
+  Future<void> dumpDebugLogs() async {}
 
   /// The GeoJSON source [sourceId], or null if the map is gone or has none.
   interop.SourceSpecification? _clusterSource(String sourceId) {

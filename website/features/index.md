@@ -22,6 +22,8 @@ platform. Android, iOS, macOS, Windows and Linux share one implementation.
 | User Location | ✅   | ✅       | ✅   | ✅       | ✅     | ✅     |
 | Paused Rendering | ➖ | ✅      | ✅   | ✅       | ✅     | ✅     |
 | Globe Projection | ✅ | ❌      | ❌   | ❌       | ❌     | ❌     |
+| Debug Overlays   | ✅ | ✅      | ✅   | ✅       | ✅     | ✅     |
+| Map Log in Dart  | ❌ | ✅      | ✅   | ✅       | ✅     | ✅     |
 | MBTiles       | ❌   | ✅       | ✅   | ✅       | ✅     | ✅     |
 | PMTiles       | ✅   | ✅       | ✅   | ✅       | ✅     | ✅     |
 

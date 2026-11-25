@@ -26,6 +26,7 @@ export 'src/gestures/map_gesture_detector.dart';
 export 'src/layer/layer.dart';
 export 'src/layer/layer_anchor.dart';
 export 'src/layer/marker_icon.dart';
+export 'src/logging.dart';
 export 'src/map_controller.dart';
 export 'src/map_events.dart';
 export 'src/map_style.dart';

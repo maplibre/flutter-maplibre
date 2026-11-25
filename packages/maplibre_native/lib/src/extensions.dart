@@ -28,6 +28,51 @@ final mln.RuntimeEventFlag _baseEventMask =
     mln.RuntimeEventFlag.mapGlyphsError |
     mln.RuntimeEventFlag.mapSpriteError;
 
+/// Extension methods for [MapDebugOverlays].
+extension MapDebugOverlaysExt on MapDebugOverlays {
+  /// The debug flags of the C API. [MapDebugOverlays.renderingStats] is a
+  /// separate call.
+  mln.MapDebugFlag toMln() =>
+      (tileBorders ? mln.MapDebugFlag.tileBorders : mln.MapDebugFlag.none) |
+      (collisionBoxes ? mln.MapDebugFlag.collision : mln.MapDebugFlag.none) |
+      (overdraw ? mln.MapDebugFlag.overdraw : mln.MapDebugFlag.none);
+}
+
+/// Extension methods for [mln.LogSeverity].
+extension MlnLogSeverityExt on mln.LogSeverity {
+  /// The [MapLogSeverity] of this severity.
+  MapLogSeverity toMapLogSeverity() => switch (this) {
+    mln.LogSeverity.warning => .warning,
+    mln.LogSeverity.error => .error,
+    _ => .info,
+  };
+}
+
+/// Extension methods for [mln.LogEvent].
+extension MlnLogEventExt on mln.LogEvent {
+  /// The [MapLogCategory] of this event, [MapLogCategory.general] for an
+  /// event that this plugin doesn't know.
+  MapLogCategory toMapLogCategory() => switch (this) {
+    mln.LogEvent.setup => .setup,
+    mln.LogEvent.shader => .shader,
+    mln.LogEvent.parseStyle => .parseStyle,
+    mln.LogEvent.parseTile => .parseTile,
+    mln.LogEvent.render => .render,
+    mln.LogEvent.style => .style,
+    mln.LogEvent.database => .database,
+    mln.LogEvent.httpRequest => .httpRequest,
+    mln.LogEvent.sprite => .sprite,
+    mln.LogEvent.image => .image,
+    mln.LogEvent.graphicsBackend => .graphicsBackend,
+    mln.LogEvent.jni => .jni,
+    mln.LogEvent.android => .android,
+    mln.LogEvent.crash => .crash,
+    mln.LogEvent.glyph => .glyph,
+    mln.LogEvent.timing => .timing,
+    _ => .general,
+  };
+}
+
 /// Extension methods for the [MapLibreMap] widget.
 extension MapLibreMapExt on MapLibreMap {
   /// The events that the callbacks of this map need.

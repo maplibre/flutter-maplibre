@@ -152,3 +152,18 @@
   A map can keep global state across a style switch (gl-js's diffed
   `setStyle` does), so the new style also resets the keys that the previous
   one set and the options no longer have, once its defaults are read.
+- **Debug overlays are declarative, `MapOptions.debugOverlays`; the log is
+  static, `MapLibreLog.onMessage`; the state dump is imperative,
+  `MapController.dumpDebugLogs()`.** Overlays are per-map state that apps
+  toggle with `setState`. The C library's log callback belongs to the
+  process, so the log is static like `MapLibreNetwork`, and native clears
+  it only when its own isolate set it, so that an engine without a callback
+  keeps another engine's. The dump is an action. `MapLogCategory` follows
+  the C library's log events; an unknown event is `general`, and a new
+  value is not breaking, as apps get one message at a time. Only the
+  overlays of both platforms are exposed, plus native's rendering stats as
+  a setting without effect on web. Left out: the render session's
+  `getCapabilities` (it describes how the plugin moves frames, nothing an
+  app can act on) and gl-js's `collectResourceTiming` (web only, limited to
+  worker requests, and delivered through `data` events that the API leaves
+  out).
