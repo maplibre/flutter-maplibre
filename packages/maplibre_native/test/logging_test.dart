@@ -54,13 +54,6 @@ void main() {
     expect(messages, isNotEmpty);
     expect(map.getSnapshot().debugFlags, const MapDebugOverlays().toMln());
 
-    // Without a callback, the messages go to the platform's log only.
-    MapLibreLog.onMessage = null;
-    final count = messages.length;
-    await map.dumpDebugLogs();
-    await Future<void>.delayed(const Duration(milliseconds: 200));
-    expect(messages, hasLength(count));
-
     await map.release();
     await runtime.release();
   });

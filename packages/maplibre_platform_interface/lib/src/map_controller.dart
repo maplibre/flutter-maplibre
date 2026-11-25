@@ -163,6 +163,10 @@ abstract interface class MapController {
   /// [MapLibreLog.onMessage] and the platform's log, to attach to a bug
   /// report.
   ///
+  /// The future completes once the map ran the dump; the messages reach
+  /// [MapLibreLog.onMessage] shortly after, so keep it set instead of
+  /// reading the log right after the `await`.
+  ///
   /// Not on web, where it has no effect.
   Future<void> dumpDebugLogs();
 }

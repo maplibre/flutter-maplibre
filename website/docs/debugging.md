@@ -56,10 +56,19 @@ Not on web; errors reach
 ## Dump the map state
 
 `MapController.dumpDebugLogs()` logs the internal state of a map and its
-renderer to the map log. Attach it to a bug report:
+renderer to the map log. The future completes once the map ran the dump, and
+the messages arrive shortly after, so keep `onMessage` set and attach what it
+collected to a bug report:
 
 ```dart
-MapLibreLog.onMessage = (message) => report.writeln(message.message);
+// At app start: keep the latest messages.
+final mapLog = Queue<MapLogMessage>();
+MapLibreLog.onMessage = (message) {
+  mapLog.add(message);
+  if (mapLog.length > 500) mapLog.removeFirst();
+};
+
+// When the user reports a bug.
 await controller.dumpDebugLogs();
 ```
 

@@ -155,11 +155,13 @@ abstract final class MapLibreLog {
     _changes.notify();
   }
 
-  /// Notifies the platform implementations when [onMessage] changes.
+  /// Notifies the platform implementations when [onMessage] changes. For
+  /// the platform implementations, not for apps.
   static Listenable get changes => _changes;
 
   /// Passes [message] to [onMessage]. An error that it throws is reported
-  /// to [FlutterError.onError].
+  /// to [FlutterError.onError]. For the platform implementations, not for
+  /// apps.
   static void log(MapLogMessage message) {
     final callback = _onMessage;
     if (callback == null) return;
