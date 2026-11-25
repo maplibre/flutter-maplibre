@@ -3,6 +3,7 @@ import 'package:maplibre_platform_interface/maplibre_platform_interface.dart';
 import 'package:maplibre_platform_interface/src/style/expressions/expression_json.dart';
 import 'package:maplibre_platform_interface/src/widget/inherited_model.dart';
 
+part 'map_debug_overlays.dart';
 part 'map_gestures.dart';
 part 'map_movements.dart';
 
@@ -26,6 +27,7 @@ class MapOptions {
     this.fastPforEnabled = false,
     this.localIdeographFontFamily = 'sans-serif',
     this.globalState = const {},
+    this.debugOverlays = const MapDebugOverlays.none(),
   });
 
   /// Find the [MapOptions] of the closest [MapLibreMap] in the widget tree.
@@ -134,6 +136,13 @@ class MapOptions {
   /// Defaults to no values.
   final Map<String, Object?> globalState;
 
+  /// The debug overlays that the map draws, such as tile borders and
+  /// collision boxes. Defaults to none.
+  ///
+  /// Turn them on while developing, for example to find out why a label is
+  /// hidden. See [MapDebugOverlays].
+  final MapDebugOverlays debugOverlays;
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -149,7 +158,8 @@ class MapOptions {
           gestures == other.gestures &&
           fastPforEnabled == other.fastPforEnabled &&
           localIdeographFontFamily == other.localIdeographFontFamily &&
-          jsonEquals(globalState, other.globalState);
+          jsonEquals(globalState, other.globalState) &&
+          debugOverlays == other.debugOverlays;
 
   @override
   int get hashCode => Object.hash(
@@ -165,5 +175,6 @@ class MapOptions {
     fastPforEnabled,
     localIdeographFontFamily,
     jsonHash(globalState),
+    debugOverlays,
   );
 }

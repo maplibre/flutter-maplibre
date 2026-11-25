@@ -25,6 +25,7 @@ nav:
           - User Location: docs/user-location.md
           - Offline & Cache: docs/offline.md
           - Network: docs/network.md
+          - Debugging: docs/debugging.md
       - Annotations:
           - Annotation Layers: docs/annotations/index.md
           - Widgets: docs/annotations/widgets.md

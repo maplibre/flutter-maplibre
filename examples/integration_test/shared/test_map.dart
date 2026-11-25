@@ -30,12 +30,14 @@ MapOptions offlineOptions({
   double maxZoom = 22,
   MapGestures gestures = const MapGestures(),
   MapMovements movements = const MapMovements(),
+  MapDebugOverlays debugOverlays = const MapDebugOverlays.none(),
 }) => MapOptions(
   style: MapStyle.json(offlineStyle),
   minZoom: minZoom,
   maxZoom: maxZoom,
   gestures: gestures,
   movements: movements,
+  debugOverlays: debugOverlays,
   initCamera: CameraUpdate.position(
     center: center,
     zoom: zoom,

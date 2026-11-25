@@ -123,6 +123,18 @@ extension type JsMap._(Camera _) implements Camera {
   @JS('_fadeDuration')
   external set fadeDuration(num value);
 
+  /// Whether the map outlines each tile and labels it with its id.
+  external bool get showTileBoundaries;
+  external set showTileBoundaries(bool value);
+
+  /// Whether the map draws the collision boxes of symbol placement.
+  external bool get showCollisionBoxes;
+  external set showCollisionBoxes(bool value);
+
+  /// Whether the map shades each pixel by how often it was drawn.
+  external bool get showOverdrawInspector;
+  external set showOverdrawInspector(bool value);
+
   /// Update the maximum bounding box of the map camera.
   external void setMaxBounds(LngLatBounds? maxBounds);
 

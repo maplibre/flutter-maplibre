@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:maplibre_native/src/android/android_plugin.dart';
 import 'package:maplibre_native/src/extensions.dart';
+import 'package:maplibre_native/src/logging.dart';
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:maplibre_platform_interface/maplibre_platform_interface.dart'
     show MapLibreNetwork, RequestHeaders;
@@ -34,12 +35,14 @@ Future<String> _createDatabasePath() async {
 /// its resource cache and offline regions.
 ///
 /// The runtime requests its resources with the settings of
-/// [MapLibreNetwork], also after they change.
+/// [MapLibreNetwork], also after they change, and its log reaches
+/// `MapLibreLog.onMessage`.
 Future<RuntimeHandle> createRuntime() async {
   final path = await databasePath();
   // Android needs the C library initialized before its first use.
   if (Platform.isAndroid) AndroidPlugin.initialize();
   _applyNetworkStatus();
+  listenToLog();
   final runtime = RuntimeHandle.create(
     options: RuntimeOptions(cachePath: path),
   );

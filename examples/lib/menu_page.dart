@@ -1,6 +1,7 @@
 import 'package:maplibre/maplibre.dart';
 import 'package:maplibre_example/animation_page.dart';
 import 'package:maplibre_example/controller_page.dart';
+import 'package:maplibre_example/debugging_page.dart';
 import 'package:maplibre_example/events_page.dart';
 import 'package:maplibre_example/features_query_page.dart';
 import 'package:maplibre_example/gestures_page.dart';
@@ -122,6 +123,11 @@ class MenuPage extends StatelessWidget {
                           label: 'Paused Rendering',
                           iconData: Icons.pause_circle,
                           location: PausedRenderingPage.location,
+                        ),
+                        const ItemCard(
+                          label: 'Debugging',
+                          iconData: Icons.bug_report,
+                          location: DebuggingPage.location,
                         ),
                         if (OfflineManager.isSupported)
                           const ItemCard(

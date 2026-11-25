@@ -10,6 +10,9 @@
   `StyleController.globalState` reads.
 - `StyleController.light` reads and changes the style's light, and
   `StyleController.transition` its default transition.
+- Debugging: `MapOptions.debugOverlays` draws tile borders, collision boxes,
+  overdraw and rendering stats, `MapLibreLog.onMessage` receives the map log
+  (not on web) and `MapController.dumpDebugLogs` logs the map state.
 
 ## 0.4.0
 

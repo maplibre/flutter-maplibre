@@ -1,6 +1,7 @@
 import 'package:integration_test/integration_test.dart';
 
 import 'camera_test.dart' as camera;
+import 'debugging_test.dart' as debugging;
 import 'events_test.dart' as events;
 import 'features_test.dart' as features;
 import 'gestures_test.dart' as gestures;
@@ -35,4 +36,5 @@ void main() {
   offline.runTests();
   paused.runTests();
   unsupported.runTests();
+  debugging.runTests();
 }

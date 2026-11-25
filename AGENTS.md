@@ -48,6 +48,7 @@ together, with diagrams.
     `map_plugin_registry.dart`, and `inherited_model.dart` behind
     `MapController.of`, `CameraPosition.of` and `MapOptions.of`.
   - `lib/src/network.dart`: `MapLibreNetwork`.
+  - `lib/src/logging.dart`: `MapLibreLog`, the map log.
 - `packages/maplibre_web`: web, on maplibre-gl-js.
 - `packages/maplibre_geolocator`: adapter from `geolocator` positions to
   `UserLocationLayer`.

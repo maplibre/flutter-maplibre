@@ -1,5 +1,6 @@
 import 'package:maplibre_example/animation_page.dart';
 import 'package:maplibre_example/controller_page.dart';
+import 'package:maplibre_example/debugging_page.dart';
 import 'package:maplibre_example/events_page.dart';
 import 'package:maplibre_example/features_query_page.dart';
 import 'package:maplibre_example/gestures_page.dart';
@@ -68,6 +69,7 @@ class MyApp extends StatelessWidget {
         StyledMapPage.location: (context) => const StyledMapPage(),
         UserLocationPage.location: (context) => const UserLocationPage(),
         PausedRenderingPage.location: (context) => const PausedRenderingPage(),
+        DebuggingPage.location: (context) => const DebuggingPage(),
         WidgetLayerPage.location: (context) => const WidgetLayerPage(),
         WidgetLayerInteractivePage.location: (context) =>
             const WidgetLayerInteractivePage(),

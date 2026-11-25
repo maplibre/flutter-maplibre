@@ -158,4 +158,11 @@ abstract interface class MapController {
     int limit = 10,
     int offset = 0,
   });
+
+  /// Logs the internal state of the map and its renderer to
+  /// [MapLibreLog.onMessage] and the platform's log, to attach to a bug
+  /// report.
+  ///
+  /// Not on web, where it has no effect.
+  Future<void> dumpDebugLogs();
 }

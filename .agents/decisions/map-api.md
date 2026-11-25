@@ -152,3 +152,24 @@
   A map can keep global state across a style switch (gl-js's diffed
   `setStyle` does), so the new style also resets the keys that the previous
   one set and the options no longer have, once its defaults are read.
+- **Debug overlays are declarative, `MapOptions.debugOverlays`; the log is
+  static, `MapLibreLog.onMessage`; the state dump is imperative,
+  `MapController.dumpDebugLogs()`.** Overlays are per-map state that apps
+  toggle with `setState`, so they are an option class (`MapDebugOverlays`,
+  `.none()` the default) and have no controller setter. Native sets
+  `setDebugFlags` and `setRenderingStatsViewEnabled` in `setUp`, before the
+  first frame, and only the flags that changed later; web sets
+  `showTileBoundaries`, `showCollisionBoxes` and `showOverdrawInspector`.
+  gl-js has no rendering stats overlay. Only the overlays of both platforms
+  are exposed: native's `parseStatus`, `timestamps`, `stencilClip` and
+  `depthBuffer` flags are left out. The C library's log callback belongs to
+  the process, so the log is static like `MapLibreNetwork`. Native installs
+  it on the first runtime of the isolate and on each change, keeps the
+  platform's log (`platformSeverities: all`), and clears it only when this
+  isolate set it, so an engine without a callback leaves another engine's.
+  gl-js has no log, so `onMessage` is never called on web. The dump is an
+  action, and logs the map's and the render session's state. Left out:
+  `getCapabilities` of the render session (its driver kind, texture ring and
+  sync kinds describe how the plugin moves frames, not anything an app can
+  act on) and gl-js's `collectResourceTiming` (web only, limited to worker
+  requests, and delivered through `data` events the API leaves out).
