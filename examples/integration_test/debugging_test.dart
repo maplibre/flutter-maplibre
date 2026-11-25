@@ -31,7 +31,14 @@ void runTests() {
         map.controller.options.debugOverlays,
         const MapDebugOverlays.none(),
       );
-      expect(map.events.whereType<MapEventError>(), isEmpty);
+      // The overlays draw text, which asks the offline style, which has no
+      // glyphs, for glyphs on some platforms.
+      expect(
+        map.events.whereType<MapEventError>().where(
+          (error) => error.kind != MapErrorKind.glyphs,
+        ),
+        isEmpty,
+      );
     });
 
     testWidgets('dumps the debug logs into MapLibreLog', (tester) async {
