@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter/widgets.dart';
 import 'package:maplibre_native/src/extensions.dart';
 import 'package:maplibre_native/src/map_renderer.dart';
@@ -62,6 +65,8 @@ class MapLibreMapStateNative extends MapLibreMapState {
   @override
   late final GestureCameraSink gestureCamera = _NativeGestureCamera(this);
 
+  final GlobalKey _snapshotBoundary = GlobalKey();
+
   @override
   Widget buildPlatformWidget(BuildContext context) {
     final pixelRatio = MediaQuery.devicePixelRatioOf(context);
@@ -88,10 +93,45 @@ class MapLibreMapStateNative extends MapLibreMapState {
         return Listener(
           behavior: HitTestBehavior.opaque,
           onPointerDown: (_) => _map?.discarding.cancelCameraTransitions(),
-          child: Texture(textureId: renderer.textureId),
+          // The boundary gives takeSnapshot a layer it can draw, holding
+          // the map alone and none of the widgets over it.
+          child: _SnapshotBoundary(
+            key: _snapshotBoundary,
+            child: Texture(textureId: renderer.textureId),
+          ),
         );
       },
     );
+  }
+
+  @override
+  Future<Uint8List?> takeSnapshot({double? pixelRatio}) async {
+    assert(
+      pixelRatio == null || (pixelRatio > 0 && pixelRatio.isFinite),
+      'pixelRatio must be finite and > 0',
+    );
+    if (!mounted) return null;
+    final boundary = _snapshotBoundary.currentContext?.findRenderObject();
+    // Waiting for the map to paint would deadlock a caller that drives the
+    // frames itself, such as a widget test, so a map that has yet to paint
+    // gives null instead.
+    if (boundary is! _RenderSnapshotBoundary ||
+        !boundary.hasPainted ||
+        // A boundary that was dirtied since it painted still holds the
+        // layer of the frame before, which toImage asserts against.
+        boundary.debugNeedsPaint ||
+        boundary.size.isEmpty) {
+      return null;
+    }
+    final image = await boundary.toImage(
+      pixelRatio: pixelRatio ?? MediaQuery.devicePixelRatioOf(context),
+    );
+    try {
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      return data == null ? null : Uint8List.sublistView(data);
+    } finally {
+      image.dispose();
+    }
   }
 
   Future<void> _create(mln.LogicalExtent extent, double pixelRatio) async {
@@ -1042,4 +1082,25 @@ class _CameraAnimationRun {
     if (_result.isCompleted) return;
     _result.complete(cancelled ? CameraAnimationResult.cancelled : result);
   }
+}
+
+/// A [RepaintBoundary] that tells whether it has painted, which
+/// [MapLibreMapStateNative.takeSnapshot] needs in every build mode:
+/// `debugNeedsPaint` answers that in debug builds alone.
+///
+/// It is what [RenderRepaintBoundary.toImage] draws. A [Texture] is a
+/// repaint boundary already, but its render object is a [RenderBox] with no
+/// `toImage`, so a capture needs a boundary that offers one.
+class _SnapshotBoundary extends SingleChildRenderObjectWidget {
+  const _SnapshotBoundary({super.key, super.child});
+
+  @override
+  _RenderSnapshotBoundary createRenderObject(BuildContext context) =>
+      _RenderSnapshotBoundary();
+}
+
+class _RenderSnapshotBoundary extends RenderRepaintBoundary {
+  /// Whether the boundary painted and so holds the layer that
+  /// [RenderRepaintBoundary.toImage] draws.
+  bool get hasPainted => layer != null;
 }

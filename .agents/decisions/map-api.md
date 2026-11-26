@@ -167,3 +167,32 @@
   app can act on) and gl-js's `collectResourceTiming` (web only, limited to
   worker requests, and delivered through `data` events that the API leaves
   out).
+- **`MapController.takeSnapshot()` captures what the map shows, each
+  platform in its own way; every platform implements it and the shared state
+  holds no default.** The native state wraps its `Texture` in a repaint
+  boundary and draws that boundary with `toImage`, so a capture is the frame
+  on screen, without the widgets over the map, and needs no second render
+  and no new C API. The boundary is a `RenderRepaintBoundary` subclass that
+  tells whether it painted, because `toImage` needs the layer that painting
+  leaves behind and `debugNeedsPaint` answers that in debug builds alone,
+  where a release build would reach `layer!` and throw. A map that has yet
+  to paint, or has no size, gives null there, since waiting for a frame
+  would deadlock a caller that drives the frames itself, such as a widget
+  test. Flutter cannot rasterize a web map, whose element is outside its
+  layer tree, so `MapLibreMapStateWeb` reads the map canvas instead, and
+  draws it into a canvas of its own when the size asked for is not the
+  canvas's, so a capture has the documented size on every platform. A
+  default implementation in `MapLibreMapState` would have wrapped every map
+  in a repaint boundary, including the web maps that never draw one, so
+  there is no default.
+- **The web capture draws a frame with `redraw()` and copies the canvas in
+  the same task, instead of an option that keeps the image of every frame.**
+  The browser clears the drawing buffer of a WebGL canvas once it has shown
+  the frame, so a capture reads an empty canvas unless it reads the canvas
+  where the frame was drawn. `redraw()` draws synchronously, and `toBlob`
+  copies the pixels when it is called, so the copy happens before the
+  browser clears anything, as long as nothing awaits in between. The
+  alternative, a `preserveDrawingBuffer` option passed to the map at its
+  creation, would cost memory and speed on every frame of a map that may
+  never be captured, put a WebGL term in the shared `MapOptions`, and make
+  `takeSnapshot` throw where the option was not set.

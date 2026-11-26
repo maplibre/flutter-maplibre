@@ -13,6 +13,8 @@
 - Debugging: `MapOptions.debugOverlays` draws tile borders, collision boxes,
   overdraw and rendering stats, `MapLibreLog.onMessage` receives the map log
   (not on web) and `MapController.dumpDebugLogs` logs the map state.
+- `MapController.takeSnapshot()` captures the map as a PNG image, without
+  the widgets drawn over it.
 
 ## 0.4.0
 
